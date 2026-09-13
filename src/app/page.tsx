@@ -1,69 +1,233 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type CalendarEvent = {
+  date: number;
+  title: string;
+  time?: string;
+  type?: "bar" | "dot";
+};
+
+const sampleEvents: CalendarEvent[] = [
+  { date: 1, title: "First day of school", type: "bar" },
+  { date: 3, title: "Trash Day", type: "bar" },
+  { date: 3, title: "Kami violin lesson", time: "2:45 PM", type: "dot" },
+  { date: 5, title: "LHS play auditions", type: "bar" },
+  { date: 7, title: "No school - Labor Day", type: "bar" },
+  { date: 10, title: "Trash Day", type: "bar" },
+  { date: 10, title: "Kami violin lesson", time: "2:45 PM", type: "dot" },
+  { date: 12, title: "Whiskey walk", time: "4:00 PM", type: "dot" },
+  { date: 15, title: "NCY", time: "6:15 PM", type: "dot" },
+  { date: 17, title: "Beth's birthday", time: "12:00 PM", type: "dot" },
+  { date: 18, title: "Daddy - Training", type: "bar" },
+  { date: 22, title: "NCY", time: "6:15 PM", type: "dot" },
+  { date: 23, title: "Ortho", time: "9:00 AM", type: "dot" },
+  { date: 24, title: "Trash Day", type: "bar" },
+  { date: 24, title: "Kami violin lesson", time: "2:45 PM", type: "dot" },
+];
+
+const forecast = [
+  { day: "Today", icon: "☁️", high: 68, low: 55 },
+  { day: "Mon", icon: "🌤️", high: 77, low: 51 },
+  { day: "Tue", icon: "🌤️", high: 71, low: 51 },
+  { day: "Wed", icon: "☁️", high: 64, low: 55 },
+  { day: "Thu", icon: "☁️", high: 60, low: 51 },
+];
+
+function getGreeting(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default function Home() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const monthData = useMemo(() => {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const cells: (number | null)[] = [];
+
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      cells.push(null);
+    }
+
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      cells.push(day);
+    }
+
+    while (cells.length % 7 !== 0) {
+      cells.push(null);
+    }
+
+    return {
+      monthName: now.toLocaleDateString("en-US", { month: "long" }),
+      year,
+      cells,
+    };
+  }, [now]);
+
+  const formattedTime = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const formattedDate = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  const today = now.getDate();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="dashboard">
+      <aside className="sidebar">
+        <section className="card clockCard">
+          <div className="greeting">{getGreeting(now.getHours())}</div>
+          <div className="clock">{formattedTime}</div>
+          <div className="date">{formattedDate}</div>
+        </section>
+
+        <section className="card weatherCard">
+          <div className="condition">Mostly cloudy</div>
+
+          <div className="weatherMain">
+            <span className="weatherIcon">☁️</span>
+            <span className="temperature">64°</span>
+          </div>
+
+          <div className="weatherRange">
+            <span>H: 68°</span>
+            <span>L: 55°</span>
+          </div>
+        </section>
+
+        <section className="card forecastCard">
+          <div className="forecastGrid">
+            {forecast.map((item) => (
+              <div className="forecastDay" key={item.day}>
+                <div className="forecastLabel">{item.day}</div>
+                <div className="forecastIcon">{item.icon}</div>
+                <div className="forecastHigh">{item.high}°</div>
+                <div className="forecastLow">{item.low}°</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card messageCard">
+          <div className="messageText">
+            Good will steer,
+            <br />
+            but you must row.
+          </div>
+
+          <div className="mountainArt">
+            <div className="mountain mountainBack" />
+            <div className="mountain mountainFront" />
+          </div>
+        </section>
+      </aside>
+
+      <section className="calendarPanel">
+        <header className="calendarHeader">
+          <div>
+            <div className="calendarTitle">
+              {monthData.monthName} {monthData.year}
+            </div>
+            <div className="calendarSubtitle">Family Calendar</div>
+          </div>
+
+          <div className="headerActions">
+            <span className="liveDot" />
+            Live
+          </div>
+        </header>
+
+        <div className="weekdayRow">
+          {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
+            <div key={day}>{day}</div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="calendarGrid">
+          {monthData.cells.map((day, index) => {
+            const events = day
+              ? sampleEvents.filter((event) => event.date === day)
+              : [];
+
+            return (
+              <div
+                className={`calendarCell ${
+                  day === today ? "todayCell" : ""
+                }`}
+                key={`${day}-${index}`}
+              >
+                {day && (
+                  <>
+                    <div
+                      className={`dayNumber ${
+                        day === today ? "todayNumber" : ""
+                      }`}
+                    >
+                      {day}
+                    </div>
+
+                    <div className="events">
+                      {events.map((event, eventIndex) =>
+                        event.type === "bar" ? (
+                          <div
+                            className="eventBar"
+                            key={`${event.title}-${eventIndex}`}
+                          >
+                            {event.title}
+                          </div>
+                        ) : (
+                          <div
+                            className="eventDot"
+                            key={`${event.title}-${eventIndex}`}
+                          >
+                            <span className="dot" />
+                            <div>
+                              {event.time && (
+                                <span className="eventTime">
+                                  {event.time}{" "}
+                                </span>
+                              )}
+                              {event.title}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </main>
-    </div>
+
+        <footer className="calendarFooter">
+          <div className="calendarLegend">
+            <span className="legendColor blue" />
+            Family Calendar
+
+            <span className="legendColor gray" />
+            Shared Calendar
+          </div>
+        </footer>
+      </section>
+    </main>
   );
 }
