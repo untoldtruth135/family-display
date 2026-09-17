@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import {
   useEffect,
   useMemo,
@@ -7,6 +9,7 @@ import {
 } from "react";
 
 import WeatherPanels from "@/components/WeatherPanels";
+import RotatingBackground from "@/components/RotatingBackground";
 
 type CalendarEvent = {
   date: number;
@@ -17,20 +20,61 @@ type CalendarEvent = {
 
 type DisplayConfig = {
   household: {
+    id: string;
     name: string;
   };
 
   display: {
+    id: string;
+    name: string;
+
     weatherLocation: string;
-    timezone: string;
-    temperatureUnit: string;
-    use24HourClock: boolean;
-    theme: string;
+
     message: string;
+
     messageExpiresAt:
       | string
       | null;
-    updatedAt: string;
+
+    orientation:
+      | "landscape"
+      | "portrait"
+      | "auto";
+
+    timezone: string;
+
+    use24HourClock: boolean;
+
+    theme:
+      | "light"
+      | "dark"
+      | "photo";
+
+    fontFamily: string;
+
+    accentColor: string;
+
+    cardOpacity: number;
+
+    showClock: boolean;
+    showWeather: boolean;
+    showForecast: boolean;
+    showCalendar: boolean;
+    showMessage: boolean;
+
+    backgroundEnabled: boolean;
+
+    backgroundIntervalSeconds: number;
+
+    backgroundShuffle: boolean;
+
+    backgroundFit:
+      | "cover"
+      | "contain";
+
+    backgroundOverlayOpacity: number;
+
+    touchControlsEnabled: boolean;
   };
 };
 
@@ -120,9 +164,7 @@ const sampleEvents: CalendarEvent[] = [
   },
 ];
 
-function getGreeting(
-  hour: number
-) {
+function getGreeting(hour: number) {
   if (hour < 12) {
     return "Good morning";
   }
@@ -134,257 +176,468 @@ function getGreeting(
   return "Good evening";
 }
 
+function getTimeZoneParts(
+  date: Date,
+  timeZone: string
+) {
+  const formatter =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        timeZone,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        hourCycle: "h23",
+      }
+    );
+
+  const parts =
+    formatter.formatToParts(
+      date
+    );
+
+  const result:
+    Record<
+      string,
+      string
+    > = {};
+
+  for (
+    const part of parts
+  ) {
+    if (
+      part.type !==
+      "literal"
+    ) {
+      result[
+        part.type
+      ] =
+        part.value;
+    }
+  }
+
+  return {
+    year:
+      Number(
+        result.year
+      ),
+
+    month:
+      Number(
+        result.month
+      ),
+
+    day:
+      Number(
+        result.day
+      ),
+
+    hour:
+      Number(
+        result.hour
+      ),
+  };
+}
+
 export default function Home() {
-  const [now, setNow] =
-    useState(new Date());
+  const [
+    now,
+    setNow,
+  ] =
+    useState(
+      new Date()
+    );
 
   const [
     displayConfig,
     setDisplayConfig,
   ] =
-    useState<DisplayConfig | null>(
-      null
-    );
+    useState<
+      DisplayConfig | null
+    >(null);
 
   const [
     configError,
     setConfigError,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   /*
-    Update clock every second.
+    ---------------------------------------------------------
+    CLOCK
+    ---------------------------------------------------------
   */
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    const timer =
+      setInterval(
+        () => {
+          setNow(
+            new Date()
+          );
+        },
+        1000
+      );
 
     return () =>
-      clearInterval(timer);
+      clearInterval(
+        timer
+      );
   }, []);
 
   /*
-    Load settings from Supabase through
-    our secure server API.
+    ---------------------------------------------------------
+    DISPLAY CONFIGURATION
+    ---------------------------------------------------------
 
-    Recheck every 15 seconds so a change
-    made from the phone appears on the
-    wall display automatically.
+    Re-check every 15 seconds so changes made from
+    /settings appear on the wall display automatically.
   */
+
   useEffect(() => {
     async function loadConfig() {
       try {
-        const response = await fetch(
-          "/api/display-config",
-          {
-            cache: "no-store",
-          }
-        );
+        const response =
+          await fetch(
+            "/api/display-config",
+            {
+              cache:
+                "no-store",
+            }
+          );
 
-        if (!response.ok) {
+        if (
+          !response.ok
+        ) {
+          const errorData =
+            await response
+              .json()
+              .catch(
+                () => null
+              );
+
           throw new Error(
-            "Unable to load display configuration."
+            errorData?.error ??
+              "Unable to load display configuration."
           );
         }
 
         const data =
           (await response.json()) as DisplayConfig;
 
-        setDisplayConfig(data);
-        setConfigError(false);
-      } catch (error) {
+        setDisplayConfig(
+          data
+        );
+
+        setConfigError(
+          false
+        );
+      } catch (
+        error
+      ) {
         console.error(
           "Display config error:",
           error
         );
 
-        setConfigError(true);
+        setConfigError(
+          true
+        );
       }
     }
 
     loadConfig();
 
-    const timer = setInterval(
-      loadConfig,
-      15_000
-    );
+    const timer =
+      setInterval(
+        loadConfig,
+        15_000
+      );
 
     return () =>
-      clearInterval(timer);
+      clearInterval(
+        timer
+      );
   }, []);
 
+  /*
+    ---------------------------------------------------------
+    DEFAULTS
+    ---------------------------------------------------------
+  */
+
   const timezone =
-    displayConfig?.display
+    displayConfig
+      ?.display
       .timezone ??
     "America/Los_Angeles";
 
+  const orientation =
+    displayConfig
+      ?.display
+      .orientation ??
+    "landscape";
+
+  const theme =
+    displayConfig
+      ?.display
+      .theme ??
+    "light";
+
+  const fontFamily =
+    displayConfig
+      ?.display
+      .fontFamily ??
+    "Arial";
+
+  const accentColor =
+    displayConfig
+      ?.display
+      .accentColor ??
+    "#169FE8";
+
+  const cardOpacity =
+    displayConfig
+      ?.display
+      .cardOpacity ??
+    0.95;
+
   const use24HourClock =
-    displayConfig?.display
+    displayConfig
+      ?.display
       .use24HourClock ??
     false;
 
+  const showClock =
+    displayConfig
+      ?.display
+      .showClock ??
+    true;
+
+  const showWeather =
+    displayConfig
+      ?.display
+      .showWeather ??
+    true;
+
+  const showForecast =
+    displayConfig
+      ?.display
+      .showForecast ??
+    true;
+
+  const showCalendar =
+    displayConfig
+      ?.display
+      .showCalendar ??
+    true;
+
+  const showMessage =
+    displayConfig
+      ?.display
+      .showMessage ??
+    true;
+
+  const backgroundEnabled =
+    displayConfig
+      ?.display
+      .backgroundEnabled ??
+    false;
+
+  const weatherLocation =
+    displayConfig
+      ?.display
+      .weatherLocation ??
+    "Lynden, Washington";
+
   /*
-    Calendar dates currently use the
-    browser's local time.
-
-    We'll make calendar timezone handling
-    even more rigorous when Google
-    Calendar is connected.
+    ---------------------------------------------------------
+    DATE / TIME
+    ---------------------------------------------------------
   */
-  const monthData = useMemo(() => {
-    const year =
-      now.getFullYear();
 
-    const month =
-      now.getMonth();
+  const timezoneParts =
+    getTimeZoneParts(
+      now,
+      timezone
+    );
 
-    const firstDay =
-      new Date(
-        year,
-        month,
-        1
-      );
-
-    const lastDay =
-      new Date(
-        year,
-        month + 1,
-        0
-      );
-
-    const cells:
-      Array<number | null> =
-      [];
-
-    for (
-      let i = 0;
-      i < firstDay.getDay();
-      i++
-    ) {
-      cells.push(null);
-    }
-
-    for (
-      let day = 1;
-      day <=
-      lastDay.getDate();
-      day++
-    ) {
-      cells.push(day);
-    }
-
-    while (
-      cells.length % 7 !== 0
-    ) {
-      cells.push(null);
-    }
-
-    return {
-      monthName:
-        now.toLocaleDateString(
-          "en-US",
-          {
-            month: "long",
-          }
-        ),
-
-      year,
-
-      cells,
-    };
-  }, [now]);
+  /*
+    Explicit hourCycle is used here so
+    24-hour format reliably produces
+    values like 14:35 instead of 2:35 PM.
+  */
 
   const timeString =
     now.toLocaleTimeString(
       "en-US",
       {
-        timeZone: timezone,
+        timeZone:
+          timezone,
 
-        hour: "numeric",
+        hour:
+          "2-digit",
 
-        minute: "2-digit",
+        minute:
+          "2-digit",
 
-        hour12:
-          !use24HourClock,
+        hourCycle:
+          use24HourClock
+            ? "h23"
+            : "h12",
       }
     );
 
   let formattedTime =
     timeString;
 
-  let meridiem = "";
+  let meridiem =
+    "";
 
-  if (!use24HourClock) {
-    const timeParts =
+  if (
+    !use24HourClock
+  ) {
+    const match =
       timeString.match(
         /^(.+)\s(AM|PM)$/
       );
 
-    formattedTime =
-      timeParts?.[1] ??
-      timeString;
+    if (match) {
+      formattedTime =
+        match[1];
 
-    meridiem =
-      timeParts?.[2] ?? "";
+      meridiem =
+        match[2];
+    }
   }
 
   const formattedDate =
     now.toLocaleDateString(
       "en-US",
       {
-        timeZone: timezone,
+        timeZone:
+          timezone,
 
-        weekday: "long",
+        weekday:
+          "long",
 
-        month: "long",
+        month:
+          "long",
 
-        day: "numeric",
+        day:
+          "numeric",
       }
     );
 
-  const localHour =
-    Number(
-      new Intl.DateTimeFormat(
-        "en-US",
-        {
-          timeZone: timezone,
+  /*
+    ---------------------------------------------------------
+    CALENDAR GRID
+    ---------------------------------------------------------
+  */
 
-          hour: "numeric",
+  const monthData =
+    useMemo(() => {
+      const year =
+        timezoneParts.year;
 
-          hourCycle: "h23",
-        }
-      ).format(now)
-    );
+      const monthIndex =
+        timezoneParts.month -
+        1;
 
-  const today =
-    Number(
-      new Intl.DateTimeFormat(
-        "en-US",
-        {
-          timeZone: timezone,
+      const firstDay =
+        new Date(
+          year,
+          monthIndex,
+          1
+        );
 
-          day: "numeric",
-        }
-      ).format(now)
-    );
+      const lastDay =
+        new Date(
+          year,
+          monthIndex +
+            1,
+          0
+        );
 
-  const weatherLocation =
-    displayConfig?.display
-      .weatherLocation ??
-    "Lynden, Washington";
+      const cells:
+        Array<
+          number | null
+        > = [];
+
+      for (
+        let i = 0;
+        i <
+        firstDay.getDay();
+        i++
+      ) {
+        cells.push(
+          null
+        );
+      }
+
+      for (
+        let day = 1;
+        day <=
+        lastDay.getDate();
+        day++
+      ) {
+        cells.push(
+          day
+        );
+      }
+
+      while (
+        cells.length %
+          7 !==
+        0
+      ) {
+        cells.push(
+          null
+        );
+      }
+
+      return {
+        monthName:
+          new Intl.DateTimeFormat(
+            "en-US",
+            {
+              month:
+                "long",
+            }
+          ).format(
+            new Date(
+              year,
+              monthIndex,
+              1
+            )
+          ),
+
+        year,
+
+        cells,
+      };
+    }, [
+      timezoneParts.year,
+      timezoneParts.month,
+    ]);
+
+  /*
+    ---------------------------------------------------------
+    MESSAGE EXPIRATION
+    ---------------------------------------------------------
+  */
 
   let message =
-    displayConfig?.display
+    displayConfig
+      ?.display
       .message ??
     "Good will steer, but you must row.";
 
-  /*
-    If we later give a message an
-    expiration time, hide it after
-    that timestamp.
-  */
   const messageExpiration =
-    displayConfig?.display
+    displayConfig
+      ?.display
       .messageExpiresAt;
 
   if (
@@ -394,228 +647,377 @@ export default function Home() {
     ).getTime() <=
       now.getTime()
   ) {
-    message = "";
+    message =
+      "";
   }
 
+  /*
+    ---------------------------------------------------------
+    DYNAMIC SIDEBAR ROWS
+    ---------------------------------------------------------
+  */
+
+  const sidebarRows:
+    string[] = [];
+
+  if (showClock) {
+    sidebarRows.push(
+      "1.35fr"
+    );
+  }
+
+  if (showWeather) {
+    sidebarRows.push(
+      "1fr"
+    );
+  }
+
+  if (showForecast) {
+    sidebarRows.push(
+      "0.7fr"
+    );
+  }
+
+  if (showMessage) {
+    sidebarRows.push(
+      "2.7fr"
+    );
+  }
+
+  const hasSidebar =
+    sidebarRows.length >
+    0;
+
+  /*
+    ---------------------------------------------------------
+    CSS VARIABLES
+    ---------------------------------------------------------
+  */
+
+  const dashboardStyle =
+    {
+      "--accent":
+        accentColor,
+
+      "--card-opacity":
+        cardOpacity,
+
+      fontFamily,
+    } as CSSProperties;
+
+  /*
+    ---------------------------------------------------------
+    RENDER
+    ---------------------------------------------------------
+  */
+
   return (
-    <main className="dashboard">
-      <aside className="sidebar">
-        <section className="card clockCard">
-          <div className="greeting">
-            {getGreeting(
-              localHour
-            )}
-          </div>
+    <main
+      className={[
+        "dashboard",
 
-          <div className="clock">
-            <span
-              className="clockTime"
-            >
-              {formattedTime}
-            </span>
+        `theme-${theme}`,
 
-            {meridiem && (
-              <span
-                className="meridiem"
-              >
-                {meridiem}
-              </span>
-            )}
-          </div>
+        `orientation-${orientation}`,
 
-          <div className="date">
-            {formattedDate}
-          </div>
-        </section>
+        backgroundEnabled
+          ? "hasBackground"
+          : "",
 
-        <WeatherPanels
-          location={
-            weatherLocation
-          }
-        />
+        !hasSidebar
+          ? "noSidebar"
+          : "",
 
-        <section className="card messageCard">
-          <div className="messageText">
-            {message ||
-              " "}
-          </div>
+        !showCalendar
+          ? "noCalendar"
+          : "",
+      ]
+        .filter(
+          Boolean
+        )
+        .join(" ")}
+      style={
+        dashboardStyle
+      }
+    >
+      <RotatingBackground
+        enabled={
+          backgroundEnabled
+        }
+        intervalSeconds={
+          displayConfig
+            ?.display
+            .backgroundIntervalSeconds ??
+          600
+        }
+        shuffle={
+          displayConfig
+            ?.display
+            .backgroundShuffle ??
+          true
+        }
+        fit={
+          displayConfig
+            ?.display
+            .backgroundFit ??
+          "cover"
+        }
+        overlayOpacity={
+          displayConfig
+            ?.display
+            .backgroundOverlayOpacity ??
+          0.72
+        }
+      />
 
-          <div className="mountainArt">
-            <div className="mountain mountainBack" />
-
-            <div className="mountain mountainFront" />
-          </div>
-        </section>
-      </aside>
-
-      <section className="calendarPanel">
-        <header className="calendarHeader">
-          <div>
-            <div className="calendarTitle">
-              {
-                monthData.monthName
-              }{" "}
-              {monthData.year}
-            </div>
-
-            <div className="calendarSubtitle">
-              {displayConfig
-                ?.household
-                .name ??
-                "Family Calendar"}
-            </div>
-          </div>
-
-          <div className="headerActions">
-            <span className="liveDot" />
-
-            {configError
-              ? "Offline"
-              : "Live"}
-          </div>
-        </header>
-
-        <div className="weekdayRow">
-          {[
-            "SUN",
-            "MON",
-            "TUE",
-            "WED",
-            "THU",
-            "FRI",
-            "SAT",
-          ].map(
-            (day) => (
-              <div
-                key={day}
-              >
-                {day}
+      {hasSidebar && (
+        <aside
+          className="sidebar"
+          style={{
+            gridTemplateRows:
+              sidebarRows.join(
+                " "
+              ),
+          }}
+        >
+          {showClock && (
+            <section className="card clockCard">
+              <div className="greeting">
+                {getGreeting(
+                  timezoneParts.hour
+                )}
               </div>
-            )
+
+              <div className="clock">
+                <span className="clockTime">
+                  {
+                    formattedTime
+                  }
+                </span>
+
+                {meridiem && (
+                  <span className="meridiem">
+                    {
+                      meridiem
+                    }
+                  </span>
+                )}
+              </div>
+
+              <div className="date">
+                {
+                  formattedDate
+                }
+              </div>
+            </section>
           )}
-        </div>
 
-        <div className="calendarGrid">
-          {monthData.cells.map(
-            (
-              day,
-              index
-            ) => {
-              const events =
-                day
-                  ? sampleEvents.filter(
-                      (
-                        event
-                      ) =>
-                        event.date ===
-                        day
-                    )
-                  : [];
+          <WeatherPanels
+            location={
+              weatherLocation
+            }
+            showWeather={
+              showWeather
+            }
+            showForecast={
+              showForecast
+            }
+          />
 
-              const isToday =
-                day === today;
+          {showMessage && (
+            <section className="card messageCard">
+              <div className="messageText">
+                {message ||
+                  " "}
+              </div>
 
-              return (
+              <div className="mountainArt">
+                <div className="mountain mountainBack" />
+
+                <div className="mountain mountainFront" />
+              </div>
+            </section>
+          )}
+        </aside>
+      )}
+
+      {showCalendar && (
+        <section className="calendarPanel">
+          <header className="calendarHeader">
+            <div>
+              <div className="calendarTitle">
+                {
+                  monthData.monthName
+                }{" "}
+                {
+                  monthData.year
+                }
+              </div>
+
+              <div className="calendarSubtitle">
+                {displayConfig
+                  ?.household
+                  .name ??
+                  "Family Calendar"}
+              </div>
+            </div>
+
+            <div className="headerActions">
+              <span className="liveDot" />
+
+              {configError
+                ? "Offline"
+                : "Live"}
+            </div>
+          </header>
+
+          <div className="weekdayRow">
+            {[
+              "SUN",
+              "MON",
+              "TUE",
+              "WED",
+              "THU",
+              "FRI",
+              "SAT",
+            ].map(
+              (day) => (
                 <div
-                  key={`${
-                    day ??
-                    "blank"
-                  }-${index}`}
-                  className={`calendarCell ${
-                    isToday
-                      ? "todayCell"
-                      : ""
-                  }`}
+                  key={
+                    day
+                  }
                 >
-                  {day !==
-                    null && (
-                    <>
-                      <div
-                        className={`dayNumber ${
-                          isToday
-                            ? "todayNumber"
-                            : ""
-                        }`}
-                      >
-                        {
+                  {
+                    day
+                  }
+                </div>
+              )
+            )}
+          </div>
+
+          <div className="calendarGrid">
+            {monthData.cells.map(
+              (
+                day,
+                index
+              ) => {
+                const events =
+                  day
+                    ? sampleEvents.filter(
+                        (
+                          event
+                        ) =>
+                          event.date ===
                           day
-                        }
-                      </div>
+                      )
+                    : [];
 
-                      <div className="events">
-                        {events.map(
-                          (
-                            event,
-                            eventIndex
-                          ) => {
-                            const eventKey =
-                              `${event.title}-${eventIndex}`;
+                const isToday =
+                  day ===
+                  timezoneParts.day;
 
-                            if (
-                              event.type ===
-                              "bar"
-                            ) {
+                return (
+                  <div
+                    key={`${
+                      day ??
+                      "blank"
+                    }-${index}`}
+                    className={`calendarCell ${
+                      isToday
+                        ? "todayCell"
+                        : ""
+                    }`}
+                  >
+                    {day !==
+                      null && (
+                      <>
+                        <div
+                          className={`dayNumber ${
+                            isToday
+                              ? "todayNumber"
+                              : ""
+                          }`}
+                        >
+                          {
+                            day
+                          }
+                        </div>
+
+                        <div className="events">
+                          {events.map(
+                            (
+                              event,
+                              eventIndex
+                            ) => {
+                              const key =
+                                `${event.title}-${eventIndex}`;
+
+                              if (
+                                event.type ===
+                                "bar"
+                              ) {
+                                return (
+                                  <div
+                                    className="eventBar"
+                                    key={
+                                      key
+                                    }
+                                  >
+                                    {
+                                      event.title
+                                    }
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div
-                                  className="eventBar"
+                                  className="eventDot"
                                   key={
-                                    eventKey
+                                    key
                                   }
                                 >
-                                  {
-                                    event.title
-                                  }
+                                  <span className="dot" />
+
+                                  <div>
+                                    {event.time && (
+                                      <span className="eventTime">
+                                        {
+                                          event.time
+                                        }{" "}
+                                      </span>
+                                    )}
+
+                                    {
+                                      event.title
+                                    }
+                                  </div>
                                 </div>
                               );
                             }
-
-                            return (
-                              <div
-                                className="eventDot"
-                                key={
-                                  eventKey
-                                }
-                              >
-                                <span className="dot" />
-
-                                <div>
-                                  {event.time && (
-                                    <span className="eventTime">
-                                      {
-                                        event.time
-                                      }{" "}
-                                    </span>
-                                  )}
-
-                                  {
-                                    event.title
-                                  }
-                                </div>
-                              </div>
-                            );
-                          }
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            }
-          )}
-        </div>
-
-        <footer className="calendarFooter">
-          <div className="calendarLegend">
-            <span className="legendColor blue" />
-
-            Family Calendar
-
-            <span className="legendColor gray" />
-
-            Shared Calendar
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+            )}
           </div>
-        </footer>
-      </section>
+
+          <footer className="calendarFooter">
+            <div className="calendarLegend">
+              <span className="legendColor blue" />
+
+              Family Calendar
+
+              <span className="legendColor gray" />
+
+              Shared Calendar
+            </div>
+          </footer>
+        </section>
+      )}
     </main>
   );
 }

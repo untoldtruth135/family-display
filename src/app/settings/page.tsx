@@ -8,6 +8,8 @@ import {
 
 import type { User } from "@supabase/supabase-js";
 
+import BackgroundPhotoManager from "@/components/BackgroundPhotoManager";
+
 import { supabase } from "@/lib/supabase-browser";
 
 import styles from "./settings.module.css";
@@ -2284,22 +2286,12 @@ export default function SettingsPage() {
               </div>
             </label>
 
-            <div
-              className={
-                styles.comingSoon
-              }
-            >
-              <strong>
-                Photo upload
-              </strong>
-
-              <span>
-                Next step: we will add a
-                Supabase photo library here
-                with upload, delete, reorder
-                and thumbnail controls.
-              </span>
-            </div>
+            {householdId && displayId && (
+  <BackgroundPhotoManager
+    householdId={householdId}
+    displayId={displayId}
+  />
+)}
           </section>
 
           {/* =================================================

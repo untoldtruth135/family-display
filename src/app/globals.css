@@ -2,6 +2,17 @@
   box-sizing: border-box;
 }
 
+:root {
+  --accent: #169fe8;
+  --card-opacity: 0.95;
+  --text-main: #34383d;
+  --text-muted: #6d7278;
+  --card-r: 247;
+  --card-g: 248;
+  --card-b: 249;
+  --grid-line: #cdd2d5;
+}
+
 html,
 body {
   margin: 0;
@@ -10,7 +21,7 @@ body {
   min-height: 100%;
   background: #dde0e3;
   font-family: Arial, Helvetica, sans-serif;
-  color: #34383d;
+  color: var(--text-main);
 }
 
 body {
@@ -25,21 +36,25 @@ select {
 }
 
 /* =========================================================
-   MAIN DASHBOARD
+   DASHBOARD
    ========================================================= */
 
 .dashboard {
+  position: relative;
+  isolation: isolate;
+
   width: 100vw;
   height: 100vh;
+
   overflow: hidden;
+
   padding: 1.4vh;
+
   display: grid;
 
-  /*
-    Fixed-ish left panel prevents the clock/weather cards from
-    expanding into the calendar.
-  */
-  grid-template-columns: clamp(260px, 17vw, 330px) 1fr;
+  grid-template-columns:
+    clamp(260px, 17vw, 330px)
+    minmax(0, 1fr);
 
   gap: 1.2vh;
 
@@ -55,18 +70,127 @@ select {
     );
 }
 
+.dashboard.hasBackground {
+  background: #dde0e3;
+}
+
+.dashboard.noSidebar {
+  grid-template-columns: 1fr;
+}
+
+.dashboard.noCalendar {
+  grid-template-columns:
+    minmax(280px, 520px);
+
+  justify-content: center;
+}
+
 /* =========================================================
-   LEFT SIDEBAR
+   THEMES
+   ========================================================= */
+
+.theme-dark {
+  --text-main: #f1f3f5;
+  --text-muted: #bdc4ca;
+  --card-r: 35;
+  --card-g: 39;
+  --card-b: 44;
+  --grid-line: #5a6066;
+
+  background: #181b1e;
+}
+
+.theme-dark .calendarCell {
+  background:
+    rgba(
+      35,
+      39,
+      44,
+      calc(var(--card-opacity) * 0.86)
+    );
+}
+
+.theme-dark .weekdayRow {
+  background: rgba(28, 32, 36, 0.9);
+}
+
+.theme-dark .calendarSubtitle,
+.theme-dark .condition,
+.theme-dark .weatherRange,
+.theme-dark .forecastLabel,
+.theme-dark .forecastLow,
+.theme-dark .eventDot,
+.theme-dark .eventTime,
+.theme-dark .calendarLegend,
+.theme-dark .date,
+.theme-dark .greeting,
+.theme-dark .meridiem {
+  color: #c1c7cc;
+}
+
+.theme-dark .dayNumber {
+  color: #d7dbde;
+}
+
+/* =========================================================
+   ROTATING BACKGROUND
+   ========================================================= */
+
+.rotatingBackground {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 0;
+
+  overflow: hidden;
+
+  pointer-events: none;
+
+  background: #ccd2d6;
+}
+
+.rotatingBackgroundImage {
+  position: absolute;
+
+  inset: 0;
+
+  opacity: 0;
+
+  background-position: center;
+  background-repeat: no-repeat;
+
+  transition:
+    opacity 1.6s ease-in-out;
+
+  transform: scale(1.01);
+}
+
+.rotatingBackgroundImageActive {
+  opacity: 1;
+}
+
+.rotatingBackgroundOverlay {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 2;
+
+  transition:
+    background-color 0.5s ease;
+}
+
+/* =========================================================
+   SIDEBAR
    ========================================================= */
 
 .sidebar {
-  display: grid;
+  position: relative;
 
-  grid-template-rows:
-    1.35fr
-    1fr
-    0.7fr
-    2.7fr;
+  z-index: 2;
+
+  display: grid;
 
   gap: 1.2vh;
 
@@ -76,14 +200,36 @@ select {
 
 .card,
 .calendarPanel {
-  background: rgba(247, 248, 249, 0.95);
+  background:
+    rgba(
+      var(--card-r),
+      var(--card-g),
+      var(--card-b),
+      var(--card-opacity)
+    );
 
-  border: 1px solid rgba(100, 110, 120, 0.26);
+  border:
+    1px solid
+    rgba(
+      100,
+      110,
+      120,
+      0.26
+    );
 
   border-radius: 18px;
 
   box-shadow:
-    0 2px 8px rgba(30, 35, 40, 0.06);
+    0 2px 8px
+    rgba(
+      30,
+      35,
+      40,
+      0.08
+    );
+
+  backdrop-filter:
+    blur(5px);
 }
 
 /* =========================================================
@@ -93,120 +239,185 @@ select {
 .clockCard {
   display: flex;
   flex-direction: column;
+
   justify-content: center;
   align-items: center;
 
   padding: 1.2vh 1.2vw;
 
   min-width: 0;
+
   overflow: hidden;
 
   text-align: center;
 }
 
 .greeting {
-  font-size: clamp(14px, 1.15vw, 22px);
+  font-size:
+    clamp(
+      14px,
+      1.15vw,
+      22px
+    );
 
-  color: #6d7278;
+  color:
+    var(--text-muted);
 
-  margin-bottom: 0.5vh;
+  margin-bottom:
+    0.5vh;
 
-  white-space: nowrap;
-  text-align: center;
+  white-space:
+    nowrap;
 }
 
 .clock {
   display: flex;
-  align-items: baseline;
-  justify-content: center;
 
-  gap: clamp(4px, 0.35vw, 8px);
+  align-items:
+    baseline;
+
+  justify-content:
+    center;
+
+  gap:
+    clamp(
+      4px,
+      0.35vw,
+      8px
+    );
 
   width: 100%;
 
-  white-space: nowrap;
+  white-space:
+    nowrap;
+
   overflow: hidden;
 }
 
 .clockTime {
-  font-size: clamp(42px, 3.8vw, 74px);
+  font-size:
+    clamp(
+      42px,
+      3.8vw,
+      74px
+    );
 
   line-height: 1;
 
   font-weight: 300;
 
-  letter-spacing: 0.01em;
+  letter-spacing:
+    0.01em;
 }
 
 .meridiem {
-  font-size: clamp(15px, 1.15vw, 23px);
+  font-size:
+    clamp(
+      15px,
+      1.15vw,
+      23px
+    );
 
-  color: #666c72;
-
-  font-weight: 400;
+  color:
+    var(--text-muted);
 }
 
 .date {
-  font-size: clamp(13px, 1vw, 20px);
+  font-size:
+    clamp(
+      13px,
+      1vw,
+      20px
+    );
 
-  color: #72777d;
+  color:
+    var(--text-muted);
 
-  margin-top: 0.8vh;
+  margin-top:
+    0.8vh;
 
-  white-space: nowrap;
-  text-align: center;
+  white-space:
+    nowrap;
 }
 
 /* =========================================================
-   CURRENT WEATHER
+   WEATHER
    ========================================================= */
 
 .weatherCard {
   display: flex;
 
-  flex-direction: column;
+  flex-direction:
+    column;
 
-  justify-content: center;
+  justify-content:
+    center;
 
-  padding: 1vh 1.2vw;
+  padding:
+    1vh 1.2vw;
 
-  overflow: hidden;
+  overflow:
+    hidden;
 }
 
 .condition {
-  text-align: center;
+  text-align:
+    center;
 
-  font-size: clamp(14px, 1.15vw, 22px);
+  font-size:
+    clamp(
+      14px,
+      1.15vw,
+      22px
+    );
 
-  color: #6a7077;
+  color:
+    var(--text-muted);
 
-  white-space: nowrap;
+  white-space:
+    nowrap;
 
-  overflow: hidden;
+  overflow:
+    hidden;
 
-  text-overflow: ellipsis;
+  text-overflow:
+    ellipsis;
 }
 
 .weatherMain {
   display: flex;
 
-  justify-content: center;
+  justify-content:
+    center;
 
-  align-items: center;
+  align-items:
+    center;
 
   gap: 0.9vw;
 
-  margin: 0.7vh 0;
+  margin:
+    0.7vh 0;
 }
 
 .weatherIcon {
-  font-size: clamp(28px, 2.5vw, 48px);
+  font-size:
+    clamp(
+      28px,
+      2.5vw,
+      48px
+    );
 }
 
 .temperature {
-  font-size: clamp(30px, 3.2vw, 60px);
+  font-size:
+    clamp(
+      30px,
+      3.2vw,
+      60px
+    );
 
-  font-weight: 300;
+  font-weight:
+    300;
 
   line-height: 1;
 }
@@ -214,13 +425,20 @@ select {
 .weatherRange {
   display: flex;
 
-  justify-content: center;
+  justify-content:
+    center;
 
   gap: 1.2vw;
 
-  color: #7c8186;
+  color:
+    #7c8186;
 
-  font-size: clamp(12px, 0.9vw, 17px);
+  font-size:
+    clamp(
+      12px,
+      0.9vw,
+      17px
+    );
 }
 
 /* =========================================================
@@ -228,13 +446,16 @@ select {
    ========================================================= */
 
 .forecastCard {
-  padding: 0.7vh 0.35vw;
+  padding:
+    0.7vh 0.35vw;
 
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
-  overflow: hidden;
+  overflow:
+    hidden;
 }
 
 .forecastGrid {
@@ -242,7 +463,11 @@ select {
 
   display: grid;
 
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(
+      5,
+      minmax(0, 1fr)
+    );
 }
 
 .forecastDay {
@@ -250,21 +475,34 @@ select {
 
   text-align: center;
 
-  font-size: clamp(9px, 0.7vw, 13px);
+  font-size:
+    clamp(
+      9px,
+      0.7vw,
+      13px
+    );
 }
 
 .forecastLabel {
   color: #666c72;
 
-  margin-bottom: 0.2vh;
+  margin-bottom:
+    0.2vh;
 
-  white-space: nowrap;
+  white-space:
+    nowrap;
 }
 
 .forecastIcon {
-  font-size: clamp(15px, 1.2vw, 22px);
+  font-size:
+    clamp(
+      15px,
+      1.2vw,
+      22px
+    );
 
-  line-height: 1.2;
+  line-height:
+    1.2;
 }
 
 .forecastHigh {
@@ -276,7 +514,7 @@ select {
 }
 
 /* =========================================================
-   MESSAGE / QUOTE
+   MESSAGE
    ========================================================= */
 
 .messageCard {
@@ -284,7 +522,8 @@ select {
 
   overflow: hidden;
 
-  padding: 2.2vh 1.2vw;
+  padding:
+    2.2vh 1.2vw;
 
   min-height: 0;
 }
@@ -296,23 +535,35 @@ select {
 
   text-align: center;
 
-  font-size: clamp(17px, 1.35vw, 27px);
+  font-size:
+    clamp(
+      17px,
+      1.35vw,
+      27px
+    );
 
   line-height: 1.6;
 
-  color: #4f565d;
+  color:
+    var(--text-main);
 
-  letter-spacing: 0.02em;
+  letter-spacing:
+    0.02em;
+
+  white-space:
+    pre-wrap;
 }
 
 .mountainArt {
   position: absolute;
 
-  inset: auto 0 0 0;
+  inset:
+    auto 0 0 0;
 
   height: 55%;
 
-  overflow: hidden;
+  overflow:
+    hidden;
 
   opacity: 0.28;
 }
@@ -323,30 +574,31 @@ select {
   bottom: -18%;
 
   width: 95%;
-
   height: 80%;
 
   left: 2%;
 
-  clip-path: polygon(
-    0 100%,
-    8% 72%,
-    17% 80%,
-    27% 52%,
-    36% 67%,
-    48% 28%,
-    58% 62%,
-    70% 40%,
-    79% 65%,
-    90% 38%,
-    100% 100%
-  );
+  clip-path:
+    polygon(
+      0 100%,
+      8% 72%,
+      17% 80%,
+      27% 52%,
+      36% 67%,
+      48% 28%,
+      58% 62%,
+      70% 40%,
+      79% 65%,
+      90% 38%,
+      100% 100%
+    );
 }
 
 .mountainBack {
   background: #95a09f;
 
-  transform: scale(1.18);
+  transform:
+    scale(1.18);
 
   opacity: 0.45;
 }
@@ -360,6 +612,10 @@ select {
    ========================================================= */
 
 .calendarPanel {
+  position: relative;
+
+  z-index: 2;
+
   overflow: hidden;
 
   display: grid;
@@ -378,43 +634,68 @@ select {
 .calendarHeader {
   min-height: 7vh;
 
-  padding: 1vh 1.3vw;
+  padding:
+    1vh 1.3vw;
 
-  border-bottom: 1px solid #d0d4d7;
+  border-bottom:
+    1px solid
+    var(--grid-line);
 
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
-  justify-content: space-between;
+  justify-content:
+    space-between;
 }
 
 .calendarTitle {
-  font-size: clamp(18px, 1.55vw, 30px);
+  font-size:
+    clamp(
+      18px,
+      1.55vw,
+      30px
+    );
 
-  letter-spacing: 0.12em;
+  letter-spacing:
+    0.12em;
 
-  text-transform: uppercase;
+  text-transform:
+    uppercase;
 
-  white-space: nowrap;
+  white-space:
+    nowrap;
 }
 
 .calendarSubtitle {
   color: #8a8e93;
 
-  font-size: clamp(11px, 0.8vw, 15px);
+  font-size:
+    clamp(
+      11px,
+      0.8vw,
+      15px
+    );
 
-  margin-top: 0.25vh;
+  margin-top:
+    0.25vh;
 }
 
 .headerActions {
-  font-size: clamp(11px, 0.8vw, 15px);
+  font-size:
+    clamp(
+      11px,
+      0.8vw,
+      15px
+    );
 
   color: #767b80;
 
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
   gap: 0.5vw;
 }
@@ -424,13 +705,15 @@ select {
 
   height: 10px;
 
-  background: #159be7;
+  background:
+    var(--accent);
 
-  border-radius: 50%;
+  border-radius:
+    50%;
 }
 
 /* =========================================================
-   WEEKDAY HEADER
+   WEEKDAYS
    ========================================================= */
 
 .weekdayRow {
@@ -438,31 +721,55 @@ select {
 
   display: grid;
 
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns:
+    repeat(
+      7,
+      1fr
+    );
 
-  border-bottom: 1px solid #cfd3d6;
+  border-bottom:
+    1px solid
+    var(--grid-line);
 
-  background: rgba(236, 239, 241, 0.8);
+  background:
+    rgba(
+      236,
+      239,
+      241,
+      0.8
+    );
 }
 
 .weekdayRow > div {
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
-  justify-content: center;
+  justify-content:
+    center;
 
-  border-right: 1px solid #d1d5d8;
+  border-right:
+    1px solid
+    var(--grid-line);
 
-  font-size: clamp(9px, 0.72vw, 14px);
+  font-size:
+    clamp(
+      9px,
+      0.72vw,
+      14px
+    );
 
-  color: #73787d;
+  color:
+    var(--text-muted);
 
-  letter-spacing: 0.12em;
+  letter-spacing:
+    0.12em;
 }
 
 .weekdayRow > div:last-child {
-  border-right: none;
+  border-right:
+    none;
 }
 
 /* =========================================================
@@ -472,9 +779,14 @@ select {
 .calendarGrid {
   display: grid;
 
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns:
+    repeat(
+      7,
+      1fr
+    );
 
-  grid-auto-rows: 1fr;
+  grid-auto-rows:
+    1fr;
 
   min-height: 0;
 }
@@ -484,59 +796,108 @@ select {
 
   min-height: 0;
 
-  border-right: 1px solid #cdd2d5;
+  border-right:
+    1px solid
+    var(--grid-line);
 
-  border-bottom: 1px solid #cdd2d5;
+  border-bottom:
+    1px solid
+    var(--grid-line);
 
-  padding: 0.55vh 0.42vw;
+  padding:
+    0.55vh 0.42vw;
 
-  background: rgba(247, 248, 249, 0.56);
+  background:
+    rgba(
+      var(--card-r),
+      var(--card-g),
+      var(--card-b),
+      calc(
+        var(--card-opacity) *
+        0.60
+      )
+    );
 
-  overflow: hidden;
+  overflow:
+    hidden;
 }
 
 .calendarCell:nth-child(7n) {
-  border-right: none;
+  border-right:
+    none;
 }
 
 .todayCell {
-  background: rgba(223, 239, 248, 0.65);
+  background:
+    color-mix(
+      in srgb,
+      var(--accent) 12%,
+      rgba(
+        var(--card-r),
+        var(--card-g),
+        var(--card-b),
+        var(--card-opacity)
+      )
+    );
 }
 
 .dayNumber {
-  font-size: clamp(10px, 0.82vw, 16px);
+  font-size:
+    clamp(
+      10px,
+      0.82vw,
+      16px
+    );
 
-  color: #6f7479;
+  color:
+    var(--text-muted);
 
-  margin-bottom: 0.5vh;
+  margin-bottom:
+    0.5vh;
 }
 
 .todayNumber {
-  display: inline-flex;
+  display:
+    inline-flex;
 
-  width: clamp(18px, 1.5vw, 28px);
+  width:
+    clamp(
+      18px,
+      1.5vw,
+      28px
+    );
 
-  height: clamp(18px, 1.5vw, 28px);
+  height:
+    clamp(
+      18px,
+      1.5vw,
+      28px
+    );
 
-  align-items: center;
+  align-items:
+    center;
 
-  justify-content: center;
+  justify-content:
+    center;
 
-  border-radius: 50%;
+  border-radius:
+    50%;
 
-  background: #f4a11b;
+  background:
+    #f4a11b;
 
   color: white;
 }
 
 /* =========================================================
-   CALENDAR EVENTS
+   EVENTS
    ========================================================= */
 
 .events {
   display: flex;
 
-  flex-direction: column;
+  flex-direction:
+    column;
 
   gap: 0.38vh;
 }
@@ -544,49 +905,81 @@ select {
 .eventBar {
   width: 100%;
 
-  padding: 0.28vh 0.35vw;
+  padding:
+    0.28vh 0.35vw;
 
-  background: #169fe8;
+  background:
+    var(--accent);
 
   color: white;
 
-  border-radius: 4px;
+  border-radius:
+    4px;
 
-  white-space: nowrap;
+  white-space:
+    nowrap;
 
-  overflow: hidden;
+  overflow:
+    hidden;
 
-  text-overflow: ellipsis;
+  text-overflow:
+    ellipsis;
 
-  font-size: clamp(9px, 0.68vw, 13px);
+  font-size:
+    clamp(
+      9px,
+      0.68vw,
+      13px
+    );
 }
 
 .eventDot {
   display: flex;
 
-  align-items: flex-start;
+  align-items:
+    flex-start;
 
   gap: 0.35vw;
 
-  font-size: clamp(8px, 0.65vw, 12.5px);
+  font-size:
+    clamp(
+      8px,
+      0.65vw,
+      12.5px
+    );
 
-  line-height: 1.3;
+  line-height:
+    1.3;
 
   color: #565c62;
 }
 
 .dot {
-  margin-top: 0.32em;
+  margin-top:
+    0.32em;
 
-  flex: 0 0 auto;
+  flex:
+    0 0 auto;
 
-  width: clamp(6px, 0.48vw, 9px);
+  width:
+    clamp(
+      6px,
+      0.48vw,
+      9px
+    );
 
-  height: clamp(6px, 0.48vw, 9px);
+  height:
+    clamp(
+      6px,
+      0.48vw,
+      9px
+    );
 
-  border-radius: 50%;
+  border-radius:
+    50%;
 
-  background: #159fe8;
+  background:
+    var(--accent);
 }
 
 .eventTime {
@@ -602,23 +995,32 @@ select {
 
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
-  justify-content: center;
+  justify-content:
+    center;
 
-  padding: 0.5vh 1vw;
+  padding:
+    0.5vh 1vw;
 }
 
 .calendarLegend {
   display: flex;
 
-  align-items: center;
+  align-items:
+    center;
 
   gap: 0.55vw;
 
   color: #71767b;
 
-  font-size: clamp(9px, 0.76vw, 14px);
+  font-size:
+    clamp(
+      9px,
+      0.76vw,
+      14px
+    );
 }
 
 .legendColor {
@@ -630,24 +1032,341 @@ select {
 
   min-height: 7px;
 
-  display: inline-block;
+  display:
+    inline-block;
 
-  margin-left: 0.8vw;
+  margin-left:
+    0.8vw;
 }
 
 .legendColor.blue {
-  background: #159fe8;
+  background:
+    var(--accent);
 }
 
 .legendColor.gray {
-  background: #737a82;
+  background:
+    #737a82;
 }
 
 /* =========================================================
-   TABLET / SMALLER SCREEN
+   PHOTO MANAGER
    ========================================================= */
 
-@media (max-width: 900px) {
+.photoManager {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap: 16px;
+}
+
+.photoUploadRow {
+  display: flex;
+
+  align-items:
+    center;
+
+  gap: 14px;
+
+  flex-wrap:
+    wrap;
+}
+
+.photoUploadButton {
+  display:
+    inline-flex !important;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    11px 17px;
+
+  border-radius:
+    9px;
+
+  background:
+    #169fe8;
+
+  color:
+    white !important;
+
+  font-weight:
+    700 !important;
+
+  cursor:
+    pointer;
+}
+
+.photoUploadButton:hover {
+  background:
+    #078ed3;
+}
+
+.photoUploadButton input {
+  display: none;
+}
+
+.photoUploadHelp {
+  color: #777e84;
+
+  font-size: 13px;
+}
+
+.photoGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(
+        180px,
+        1fr
+      )
+    );
+
+  gap: 14px;
+}
+
+.photoTile {
+  overflow: hidden;
+
+  background: white;
+
+  border:
+    1px solid
+    #dce1e4;
+
+  border-radius:
+    12px;
+
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.photoDisabled {
+  opacity: 0.48;
+}
+
+.photoPreview {
+  width: 100%;
+
+  aspect-ratio:
+    16 / 10;
+
+  overflow: hidden;
+
+  background:
+    #e9edef;
+}
+
+.photoPreview img {
+  width: 100%;
+
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+}
+
+.photoUnavailable {
+  width: 100%;
+
+  height: 100%;
+
+  display: flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding: 15px;
+
+  color: #7a8085;
+
+  text-align:
+    center;
+
+  font-size:
+    13px;
+}
+
+.photoInfo {
+  padding: 10px;
+
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap: 9px;
+}
+
+.photoName {
+  overflow: hidden;
+
+  white-space:
+    nowrap;
+
+  text-overflow:
+    ellipsis;
+
+  font-size: 13px;
+
+  color: #4f555a;
+}
+
+.photoActions {
+  display: flex;
+
+  gap: 7px;
+}
+
+.photoToggleButton,
+.photoDeleteButton {
+  flex: 1;
+
+  border: none;
+
+  border-radius:
+    7px;
+
+  padding:
+    7px 8px;
+
+  cursor:
+    pointer;
+
+  font-size:
+    12px;
+
+  font-weight:
+    600;
+}
+
+.photoToggleButton {
+  background:
+    #e7f4fb;
+
+  color:
+    #137bad;
+}
+
+.photoDeleteButton {
+  background:
+    #fbeaea;
+
+  color:
+    #a53737;
+}
+
+.photoEmpty {
+  padding: 22px;
+
+  border:
+    1px dashed
+    #cfd6da;
+
+  border-radius:
+    10px;
+
+  background:
+    #f8fafb;
+
+  color: #767d82;
+
+  text-align:
+    center;
+
+  font-size:
+    14px;
+}
+
+.photoError,
+.photoSuccess {
+  padding:
+    11px 13px;
+
+  border-radius:
+    9px;
+
+  font-size:
+    13px;
+}
+
+.photoError {
+  background:
+    #fff0f0;
+
+  color:
+    #a52b2b;
+
+  border:
+    1px solid
+    #f1c5c5;
+}
+
+.photoSuccess {
+  background:
+    #eef9f1;
+
+  color:
+    #246c38;
+
+  border:
+    1px solid
+    #c5e7cf;
+}
+
+/* =========================================================
+   PORTRAIT MODE
+   ========================================================= */
+
+.orientation-portrait {
+  grid-template-columns:
+    1fr;
+
+  grid-template-rows:
+    auto 1fr;
+
+  overflow: auto;
+}
+
+.orientation-portrait .sidebar {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  grid-template-rows:
+    auto !important;
+}
+
+.orientation-portrait .calendarPanel {
+  min-height:
+    900px;
+}
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (
+  max-width: 900px
+) {
   body {
     overflow: auto;
   }
@@ -655,26 +1374,82 @@ select {
   .dashboard {
     height: auto;
 
-    min-height: 100vh;
+    min-height:
+      100vh;
 
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
+
+    overflow: visible;
   }
 
   .sidebar {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          0,
+          1fr
+        )
+      );
 
-    grid-template-rows: auto auto;
+    grid-template-rows:
+      auto !important;
   }
 
   .calendarPanel {
-    min-height: 700px;
+    min-height:
+      700px;
   }
 
   .clockTime {
-    font-size: clamp(42px, 10vw, 70px);
+    font-size:
+      clamp(
+        42px,
+        10vw,
+        70px
+      );
   }
 
   .meridiem {
-    font-size: clamp(16px, 3vw, 24px);
+    font-size:
+      clamp(
+        16px,
+        3vw,
+        24px
+      );
+  }
+}
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+
+@media (
+  max-width: 600px
+) {
+  .dashboard {
+    padding: 8px;
+  }
+
+  .sidebar {
+    grid-template-columns:
+      1fr;
+  }
+
+  .photoGrid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          0,
+          1fr
+        )
+      );
+  }
+
+  .photoActions {
+    flex-direction:
+      column;
   }
 }

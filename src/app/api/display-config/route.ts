@@ -73,13 +73,8 @@ export async function GET() {
       .select(
         `
         weather_location,
-        timezone,
-        temperature_unit,
-        use_24_hour_clock,
-        theme,
         current_message,
-        message_expires_at,
-        updated_at
+        message_expires_at
         `
       )
       .eq(
@@ -94,11 +89,64 @@ export async function GET() {
       );
     }
 
-    if (!settings) {
+    const {
+      data: display,
+      error: displayError,
+    } = await supabase
+      .from("displays")
+      .select(
+        `
+        id,
+        name,
+        device_code,
+        orientation,
+        timezone,
+        use_24_hour_clock,
+        theme,
+        font_family,
+        accent_color,
+        card_opacity,
+        show_clock,
+        show_weather,
+        show_forecast,
+        show_calendar,
+        show_message,
+        background_enabled,
+        background_interval_seconds,
+        background_shuffle,
+        background_fit,
+        background_overlay_opacity,
+        touch_controls_enabled
+        `
+      )
+      .eq(
+        "household_id",
+        household.id
+      )
+      .eq(
+        "enabled",
+        true
+      )
+      .order(
+        "created_at",
+        {
+          ascending: true,
+        }
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (displayError) {
+      throw new Error(
+        `Display query failed: ${displayError.message}`
+      );
+    }
+
+    if (!display) {
       return NextResponse.json(
         {
           error:
-            "Display settings have not been configured.",
+            "No enabled display has been configured.",
         },
         {
           status: 404,
@@ -109,41 +157,100 @@ export async function GET() {
     return NextResponse.json(
       {
         household: {
+          id: household.id,
           name: household.name,
         },
 
         display: {
+          id: display.id,
+          name: display.name,
+
           weatherLocation:
-            settings.weather_location ??
+            settings?.weather_location ??
             "Lynden, Washington",
 
-          timezone:
-            settings.timezone ??
-            "America/Los_Angeles",
-
-          temperatureUnit:
-            settings.temperature_unit ??
-            "F",
-
-          use24HourClock:
-            settings.use_24_hour_clock ??
-            false,
-
-          theme:
-            settings.theme ??
-            "light",
-
           message:
-            settings.current_message ??
+            settings?.current_message ??
             "",
 
           messageExpiresAt:
-            settings.message_expires_at ??
+            settings?.message_expires_at ??
             null,
 
-          updatedAt:
-            settings.updated_at ??
-            null,
+          orientation:
+            display.orientation,
+
+          timezone:
+            display.timezone ??
+            "America/Los_Angeles",
+
+          use24HourClock:
+            display.use_24_hour_clock ??
+            false,
+
+          theme:
+            display.theme ??
+            "light",
+
+          fontFamily:
+            display.font_family ??
+            "Arial",
+
+          accentColor:
+            display.accent_color ??
+            "#169FE8",
+
+          cardOpacity:
+            Number(
+              display.card_opacity ??
+              0.95
+            ),
+
+          showClock:
+            display.show_clock ??
+            true,
+
+          showWeather:
+            display.show_weather ??
+            true,
+
+          showForecast:
+            display.show_forecast ??
+            true,
+
+          showCalendar:
+            display.show_calendar ??
+            true,
+
+          showMessage:
+            display.show_message ??
+            true,
+
+          backgroundEnabled:
+            display.background_enabled ??
+            false,
+
+          backgroundIntervalSeconds:
+            display.background_interval_seconds ??
+            600,
+
+          backgroundShuffle:
+            display.background_shuffle ??
+            true,
+
+          backgroundFit:
+            display.background_fit ??
+            "cover",
+
+          backgroundOverlayOpacity:
+            Number(
+              display.background_overlay_opacity ??
+              0.72
+            ),
+
+          touchControlsEnabled:
+            display.touch_controls_enabled ??
+            false,
         },
       },
       {
