@@ -1453,3 +1453,332 @@ select {
       column;
   }
 }
+/* =========================================================
+   DISPLAY SCHEDULE MANAGER
+   ========================================================= */
+
+.scheduleManager {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.scheduleForm {
+  display: grid;
+
+  grid-template-columns:
+    1.2fr
+    1fr
+    1fr
+    1fr
+    auto;
+
+  gap: 12px;
+
+  align-items: end;
+}
+
+.scheduleForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  color: #4e545a;
+}
+
+.scheduleForm input,
+.scheduleForm select {
+  width: 100%;
+
+  border:
+    1px solid
+    #cfd5d9;
+
+  border-radius:
+    9px;
+
+  padding:
+    10px 11px;
+
+  background:
+    white;
+
+  color:
+    #34383d;
+
+  outline:
+    none;
+}
+
+.scheduleAddButton {
+  border: none;
+
+  border-radius:
+    9px;
+
+  padding:
+    11px 15px;
+
+  background:
+    #169fe8;
+
+  color:
+    white;
+
+  font-weight:
+    700;
+
+  cursor:
+    pointer;
+
+  white-space:
+    nowrap;
+}
+
+.scheduleAddButton:hover {
+  background:
+    #078ed3;
+}
+
+.scheduleHelp {
+  padding:
+    13px 15px;
+
+  border:
+    1px solid
+    #dbe5eb;
+
+  border-radius:
+    10px;
+
+  background:
+    #f6fafc;
+
+  color:
+    #68757c;
+
+  font-size:
+    13px;
+
+  line-height:
+    1.5;
+}
+
+.scheduleList {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    9px;
+}
+
+.scheduleRow {
+  display:
+    grid;
+
+  grid-template-columns:
+    1.4fr
+    1.2fr
+    0.8fr
+    1.4fr;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+
+  padding:
+    12px;
+
+  border:
+    1px solid
+    #dce1e4;
+
+  border-radius:
+    10px;
+
+  background:
+    white;
+}
+
+.scheduleDisabled {
+  opacity:
+    0.48;
+}
+
+.scheduleDay {
+  font-weight:
+    700;
+
+  color:
+    #40474d;
+}
+
+.scheduleTime {
+  font-family:
+    monospace;
+
+  color:
+    #626970;
+}
+
+.scheduleAction {
+  display:
+    inline-flex;
+
+  justify-content:
+    center;
+
+  padding:
+    5px 8px;
+
+  border-radius:
+    999px;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+
+  text-transform:
+    uppercase;
+
+  letter-spacing:
+    0.06em;
+}
+
+.scheduleAction-active {
+  background:
+    #e5f6eb;
+
+  color:
+    #25723c;
+}
+
+.scheduleAction-dim {
+  background:
+    #fff4d8;
+
+  color:
+    #82620f;
+}
+
+.scheduleAction-sleep {
+  background:
+    #e9ebf3;
+
+  color:
+    #4d536a;
+}
+
+.scheduleButtons {
+  display:
+    flex;
+
+  gap:
+    7px;
+}
+
+.scheduleEmpty {
+  padding:
+    20px;
+
+  border:
+    1px dashed
+    #cfd6da;
+
+  border-radius:
+    10px;
+
+  background:
+    #f8fafb;
+
+  color:
+    #767d82;
+
+  text-align:
+    center;
+
+  font-size:
+    14px;
+}
+
+@media (
+  max-width: 750px
+) {
+  .scheduleForm {
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+  .scheduleAddButton {
+    grid-column:
+      1 / -1;
+  }
+
+  .scheduleRow {
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+  .scheduleButtons {
+    grid-column:
+      1 / -1;
+  }
+}
+@media (
+  max-width: 480px
+) {
+  .scheduleForm {
+    grid-template-columns:
+      1fr;
+  }
+
+  .scheduleRow {
+    grid-template-columns:
+      1fr;
+  }
+
+  .scheduleButtons {
+    grid-column:
+      auto;
+  }
+}
+
+/* =========================================================
+   DISPLAY SCHEDULE MODES
+   ========================================================= */
+
+.scheduleDimOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+
+  background:
+    rgba(0, 0, 0, 0.58);
+
+  pointer-events:
+    none;
+}
+
+.scheduleSleepOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  background:
+    #000000;
+
+  pointer-events:
+    none;
+}

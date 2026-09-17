@@ -20,7 +20,7 @@ export async function GET() {
 
     if (!serverKey) {
       throw new Error(
-        "No Supabase server key is configured."
+        "Supabase server key is not configured."
       );
     }
 
@@ -35,17 +35,31 @@ export async function GET() {
       }
     );
 
+    /*
+      -------------------------------------------------------
+      HOUSEHOLD
+      -------------------------------------------------------
+    */
+
     const {
-      data: household,
+      data: households,
       error: householdError,
     } = await supabase
       .from("households")
-      .select("id, name")
-      .order("created_at", {
-        ascending: true,
-      })
-      .limit(1)
-      .maybeSingle();
+      .select(
+        `
+        id,
+        name,
+        created_at
+        `
+      )
+      .order(
+        "created_at",
+        {
+          ascending: true,
+        }
+      )
+      .limit(1);
 
     if (householdError) {
       throw new Error(
@@ -53,23 +67,28 @@ export async function GET() {
       );
     }
 
+    const household =
+      households?.[0];
+
     if (!household) {
-      return NextResponse.json(
-        {
-          error:
-            "No household has been configured.",
-        },
-        {
-          status: 404,
-        }
+      throw new Error(
+        "No household was found."
       );
     }
+
+    /*
+      -------------------------------------------------------
+      HOUSEHOLD DISPLAY SETTINGS
+      -------------------------------------------------------
+    */
 
     const {
       data: settings,
       error: settingsError,
     } = await supabase
-      .from("display_settings")
+      .from(
+        "display_settings"
+      )
       .select(
         `
         weather_location,
@@ -89,8 +108,14 @@ export async function GET() {
       );
     }
 
+    /*
+      -------------------------------------------------------
+      DISPLAY
+      -------------------------------------------------------
+    */
+
     const {
-      data: display,
+      data: displays,
       error: displayError,
     } = await supabase
       .from("displays")
@@ -98,7 +123,7 @@ export async function GET() {
         `
         id,
         name,
-        device_code,
+        enabled,
         orientation,
         timezone,
         use_24_hour_clock,
@@ -116,7 +141,8 @@ export async function GET() {
         background_shuffle,
         background_fit,
         background_overlay_opacity,
-        touch_controls_enabled
+        touch_controls_enabled,
+        created_at
         `
       )
       .eq(
@@ -133,8 +159,7 @@ export async function GET() {
           ascending: true,
         }
       )
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (displayError) {
       throw new Error(
@@ -142,115 +167,188 @@ export async function GET() {
       );
     }
 
+    const display =
+      displays?.[0];
+
     if (!display) {
-      return NextResponse.json(
-        {
-          error:
-            "No enabled display has been configured.",
-        },
-        {
-          status: 404,
-        }
+      throw new Error(
+        "No enabled display was found."
       );
     }
+
+    /*
+      -------------------------------------------------------
+      SCHEDULES
+      -------------------------------------------------------
+    */
+
+    const {
+      data: scheduleRows,
+      error: scheduleError,
+    } = await supabase
+      .from(
+        "display_schedules"
+      )
+      .select(
+        `
+        id,
+        day_of_week,
+        start_time,
+        end_time,
+        action,
+        enabled
+        `
+      )
+      .eq(
+        "display_id",
+        display.id
+      )
+      .eq(
+        "enabled",
+        true
+      )
+      .order(
+        "day_of_week",
+        {
+          ascending: true,
+        }
+      )
+      .order(
+        "start_time",
+        {
+          ascending: true,
+        }
+      );
+
+    if (scheduleError) {
+      throw new Error(
+        `Schedule query failed: ${scheduleError.message}`
+      );
+    }
+
+    const schedules =
+      (
+        scheduleRows ??
+        []
+      ).map(
+        (schedule) => ({
+          id:
+            schedule.id,
+
+          dayOfWeek:
+            schedule.day_of_week,
+
+          startTime:
+            schedule.start_time,
+
+          endTime:
+            schedule.end_time,
+
+          action:
+            schedule.action,
+
+          enabled:
+            schedule.enabled,
+        })
+      );
+
+    /*
+      -------------------------------------------------------
+      RESPONSE
+      -------------------------------------------------------
+    */
 
     return NextResponse.json(
       {
         household: {
-          id: household.id,
-          name: household.name,
+          id:
+            household.id,
+
+          name:
+            household.name,
         },
 
         display: {
-          id: display.id,
-          name: display.name,
+          id:
+            display.id,
+
+          name:
+            display.name,
 
           weatherLocation:
-            settings?.weather_location ??
+            settings
+              ?.weather_location ??
             "Lynden, Washington",
 
           message:
-            settings?.current_message ??
+            settings
+              ?.current_message ??
             "",
 
           messageExpiresAt:
-            settings?.message_expires_at ??
+            settings
+              ?.message_expires_at ??
             null,
 
           orientation:
             display.orientation,
 
           timezone:
-            display.timezone ??
-            "America/Los_Angeles",
+            display.timezone,
 
           use24HourClock:
-            display.use_24_hour_clock ??
-            false,
+            display.use_24_hour_clock,
 
           theme:
-            display.theme ??
-            "light",
+            display.theme,
 
           fontFamily:
-            display.font_family ??
-            "Arial",
+            display.font_family,
 
           accentColor:
-            display.accent_color ??
-            "#169FE8",
+            display.accent_color,
 
           cardOpacity:
             Number(
-              display.card_opacity ??
-              0.95
+              display.card_opacity
             ),
 
           showClock:
-            display.show_clock ??
-            true,
+            display.show_clock,
 
           showWeather:
-            display.show_weather ??
-            true,
+            display.show_weather,
 
           showForecast:
-            display.show_forecast ??
-            true,
+            display.show_forecast,
 
           showCalendar:
-            display.show_calendar ??
-            true,
+            display.show_calendar,
 
           showMessage:
-            display.show_message ??
-            true,
+            display.show_message,
 
           backgroundEnabled:
-            display.background_enabled ??
-            false,
+            display.background_enabled,
 
           backgroundIntervalSeconds:
-            display.background_interval_seconds ??
-            600,
+            display.background_interval_seconds,
 
           backgroundShuffle:
-            display.background_shuffle ??
-            true,
+            display.background_shuffle,
 
           backgroundFit:
-            display.background_fit ??
-            "cover",
+            display.background_fit,
 
           backgroundOverlayOpacity:
             Number(
-              display.background_overlay_opacity ??
-              0.72
+              display.background_overlay_opacity
             ),
 
           touchControlsEnabled:
-            display.touch_controls_enabled ??
-            false,
+            display.touch_controls_enabled,
+
+          schedules,
         },
       },
       {

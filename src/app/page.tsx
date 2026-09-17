@@ -18,6 +18,20 @@ type CalendarEvent = {
   type?: "bar" | "dot";
 };
 
+type ScheduleAction =
+  | "active"
+  | "dim"
+  | "sleep";
+
+type DisplaySchedule = {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  action: ScheduleAction;
+  enabled: boolean;
+};
+
 type DisplayConfig = {
   household: {
     id: string;
@@ -29,7 +43,6 @@ type DisplayConfig = {
     name: string;
 
     weatherLocation: string;
-
     message: string;
 
     messageExpiresAt:
@@ -51,9 +64,7 @@ type DisplayConfig = {
       | "photo";
 
     fontFamily: string;
-
     accentColor: string;
-
     cardOpacity: number;
 
     showClock: boolean;
@@ -63,9 +74,7 @@ type DisplayConfig = {
     showMessage: boolean;
 
     backgroundEnabled: boolean;
-
     backgroundIntervalSeconds: number;
-
     backgroundShuffle: boolean;
 
     backgroundFit:
@@ -75,6 +84,9 @@ type DisplayConfig = {
     backgroundOverlayOpacity: number;
 
     touchControlsEnabled: boolean;
+
+    schedules:
+      DisplaySchedule[];
   };
 };
 
@@ -164,7 +176,23 @@ const sampleEvents: CalendarEvent[] = [
   },
 ];
 
-function getGreeting(hour: number) {
+const WEEKDAY_MAP:
+  Record<
+    string,
+    number
+  > = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+function getGreeting(
+  hour: number
+) {
   if (hour < 12) {
     return "Good morning";
   }
@@ -185,11 +213,27 @@ function getTimeZoneParts(
       "en-US",
       {
         timeZone,
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        hourCycle: "h23",
+
+        year:
+          "numeric",
+
+        month:
+          "numeric",
+
+        day:
+          "numeric",
+
+        weekday:
+          "short",
+
+        hour:
+          "2-digit",
+
+        minute:
+          "2-digit",
+
+        hourCycle:
+          "h23",
       }
     );
 
@@ -234,11 +278,178 @@ function getTimeZoneParts(
         result.day
       ),
 
+    weekday:
+      WEEKDAY_MAP[
+        result.weekday
+      ] ?? 0,
+
     hour:
       Number(
         result.hour
       ),
+
+    minute:
+      Number(
+        result.minute
+      ),
   };
+}
+
+function timeToMinutes(
+  value: string
+) {
+  const [
+    hourString,
+    minuteString,
+  ] =
+    value
+      .slice(0, 5)
+      .split(":");
+
+  return (
+    Number(
+      hourString
+    ) *
+      60 +
+    Number(
+      minuteString
+    )
+  );
+}
+
+function getScheduleMode(
+  schedules:
+    DisplaySchedule[],
+  currentDay:
+    number,
+  currentMinutes:
+    number
+): ScheduleAction {
+  const matchingActions:
+    ScheduleAction[] =
+    [];
+
+  for (
+    const schedule
+    of schedules
+  ) {
+    if (
+      !schedule.enabled
+    ) {
+      continue;
+    }
+
+    const start =
+      timeToMinutes(
+        schedule.startTime
+      );
+
+    const end =
+      timeToMinutes(
+        schedule.endTime
+      );
+
+    const scheduleDay =
+      schedule.dayOfWeek;
+
+    let matches =
+      false;
+
+    /*
+      Normal same-day schedule.
+
+      Example:
+      Monday 08:00 -> 17:00
+    */
+    if (
+      start < end
+    ) {
+      matches =
+        currentDay ===
+          scheduleDay &&
+        currentMinutes >=
+          start &&
+        currentMinutes <
+          end;
+    }
+
+    /*
+      Overnight schedule.
+
+      Example:
+      Monday 22:00 -> 06:00
+
+      This is active:
+      Monday 22:00 onward
+      AND
+      Tuesday before 06:00.
+    */
+    else if (
+      start > end
+    ) {
+      const nextDay =
+        (
+          scheduleDay +
+          1
+        ) %
+        7;
+
+      matches =
+        (
+          currentDay ===
+            scheduleDay &&
+          currentMinutes >=
+            start
+        ) ||
+        (
+          currentDay ===
+            nextDay &&
+          currentMinutes <
+            end
+        );
+    }
+
+    /*
+      Equal start/end is treated
+      as the entire selected day.
+    */
+    else {
+      matches =
+        currentDay ===
+        scheduleDay;
+    }
+
+    if (matches) {
+      matchingActions.push(
+        schedule.action
+      );
+    }
+  }
+
+  /*
+    If schedules overlap, use the
+    most restrictive action.
+
+    Sleep > Dim > Active
+  */
+
+  if (
+    matchingActions.includes(
+      "sleep"
+    )
+  ) {
+    return "sleep";
+  }
+
+  if (
+    matchingActions.includes(
+      "dim"
+    )
+  ) {
+    return "dim";
+  }
+
+  return "active";
 }
 
 export default function Home() {
@@ -265,9 +476,7 @@ export default function Home() {
     useState(false);
 
   /*
-    ---------------------------------------------------------
     CLOCK
-    ---------------------------------------------------------
   */
 
   useEffect(() => {
@@ -288,12 +497,7 @@ export default function Home() {
   }, []);
 
   /*
-    ---------------------------------------------------------
     DISPLAY CONFIGURATION
-    ---------------------------------------------------------
-
-    Re-check every 15 seconds so changes made from
-    /settings appear on the wall display automatically.
   */
 
   useEffect(() => {
@@ -315,17 +519,20 @@ export default function Home() {
             await response
               .json()
               .catch(
-                () => null
+                () =>
+                  null
               );
 
           throw new Error(
-            errorData?.error ??
+            errorData
+              ?.error ??
               "Unable to load display configuration."
           );
         }
 
         const data =
-          (await response.json()) as DisplayConfig;
+          (await response.json()) as
+            DisplayConfig;
 
         setDisplayConfig(
           data
@@ -363,9 +570,7 @@ export default function Home() {
   }, []);
 
   /*
-    ---------------------------------------------------------
     DEFAULTS
-    ---------------------------------------------------------
   */
 
   const timezone =
@@ -452,10 +657,14 @@ export default function Home() {
       .weatherLocation ??
     "Lynden, Washington";
 
+  const schedules =
+    displayConfig
+      ?.display
+      .schedules ??
+    [];
+
   /*
-    ---------------------------------------------------------
-    DATE / TIME
-    ---------------------------------------------------------
+    LOCAL TIME
   */
 
   const timezoneParts =
@@ -465,9 +674,23 @@ export default function Home() {
     );
 
   /*
-    Explicit hourCycle is used here so
-    24-hour format reliably produces
-    values like 14:35 instead of 2:35 PM.
+    SCHEDULE MODE
+  */
+
+  const currentMinutes =
+    timezoneParts.hour *
+      60 +
+    timezoneParts.minute;
+
+  const scheduleMode =
+    getScheduleMode(
+      schedules,
+      timezoneParts.weekday,
+      currentMinutes
+    );
+
+  /*
+    CLOCK FORMAT
   */
 
   const timeString =
@@ -532,9 +755,7 @@ export default function Home() {
     );
 
   /*
-    ---------------------------------------------------------
     CALENDAR GRID
-    ---------------------------------------------------------
   */
 
   const monthData =
@@ -615,7 +836,6 @@ export default function Home() {
           ),
 
         year,
-
         cells,
       };
     }, [
@@ -624,16 +844,14 @@ export default function Home() {
     ]);
 
   /*
-    ---------------------------------------------------------
     MESSAGE EXPIRATION
-    ---------------------------------------------------------
   */
 
   let message =
     displayConfig
       ?.display
       .message ??
-    "Good will steer, but you must row.";
+    "God will steer, but you must row.";
 
   const messageExpiration =
     displayConfig
@@ -652,9 +870,7 @@ export default function Home() {
   }
 
   /*
-    ---------------------------------------------------------
-    DYNAMIC SIDEBAR ROWS
-    ---------------------------------------------------------
+    SIDEBAR
   */
 
   const sidebarRows:
@@ -688,12 +904,6 @@ export default function Home() {
     sidebarRows.length >
     0;
 
-  /*
-    ---------------------------------------------------------
-    CSS VARIABLES
-    ---------------------------------------------------------
-  */
-
   const dashboardStyle =
     {
       "--accent":
@@ -704,12 +914,6 @@ export default function Home() {
 
       fontFamily,
     } as CSSProperties;
-
-  /*
-    ---------------------------------------------------------
-    RENDER
-    ---------------------------------------------------------
-  */
 
   return (
     <main
@@ -732,9 +936,7 @@ export default function Home() {
           ? "noCalendar"
           : "",
       ]
-        .filter(
-          Boolean
-        )
+        .filter(Boolean)
         .join(" ")}
       style={
         dashboardStyle
@@ -1017,6 +1219,22 @@ export default function Home() {
             </div>
           </footer>
         </section>
+      )}
+
+      {scheduleMode ===
+        "dim" && (
+        <div
+          className="scheduleDimOverlay"
+          aria-hidden="true"
+        />
+      )}
+
+      {scheduleMode ===
+        "sleep" && (
+        <div
+          className="scheduleSleepOverlay"
+          aria-hidden="true"
+        />
       )}
     </main>
   );

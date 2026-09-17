@@ -8,6 +8,8 @@ import {
 
 import type { User } from "@supabase/supabase-js";
 
+import ScheduleManager from "@/components/ScheduleManager";
+
 import BackgroundPhotoManager from "@/components/BackgroundPhotoManager";
 
 import { supabase } from "@/lib/supabase-browser";
@@ -2298,42 +2300,34 @@ export default function SettingsPage() {
               SCHEDULE
           ================================================= */}
 
-          <section
-            className={
-              styles.settingsSection
-            }
-          >
-            <div
-              className={
-                styles.sectionHeader
-              }
-            >
-              <h2>
-                Schedule
-              </h2>
+<section
+  className={
+    styles.settingsSection
+  }
+>
+  <div
+    className={
+      styles.sectionHeader
+    }
+  >
+    <h2>
+      Schedule
+    </h2>
 
-              <p>
-                Automatically dim or sleep
-                the display.
-              </p>
-            </div>
+    <p>
+      Automatically dim or sleep
+      the display.
+    </p>
+  </div>
 
-            <div
-              className={
-                styles.comingSoon
-              }
-            >
-              <strong>
-                Display scheduling
-              </strong>
-
-              <span>
-                Next phase will add
-                active, dim and sleep
-                schedules by day of week.
-              </span>
-            </div>
-          </section>
+  {displayId && (
+    <ScheduleManager
+      displayId={
+        displayId
+      }
+    />
+  )}
+</section>
 
           {/* =================================================
               STATUS
