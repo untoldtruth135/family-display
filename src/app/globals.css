@@ -1782,3 +1782,279 @@ select {
   pointer-events:
     none;
 }
+/* =========================================================
+   WEATHER PANEL LAYOUT FIX
+   ========================================================= */
+
+.weatherCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.currentWeather {
+  width: 100%;
+  height: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    82px
+    minmax(0, 1fr);
+
+  align-items: center;
+
+  column-gap: 16px;
+
+  padding:
+    14px
+    18px;
+}
+
+.weatherIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 52px;
+  line-height: 1;
+
+  width: 82px;
+  height: 82px;
+
+  overflow: hidden;
+}
+
+.weatherDetails {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 2px;
+}
+
+.temperature {
+  font-size: clamp(
+    40px,
+    4vw,
+    62px
+  );
+
+  line-height: 0.95;
+
+  font-weight: 500;
+}
+
+.condition {
+  font-size: clamp(
+    17px,
+    1.5vw,
+    24px
+  );
+
+  line-height: 1.15;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weatherLocation {
+  margin-top: 4px;
+
+  font-size: 13px;
+  line-height: 1.2;
+
+  opacity: 0.7;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   5-DAY FORECAST
+   ========================================================= */
+
+.forecastCard {
+  min-height: 0;
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+}
+
+.forecastDays {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      5,
+      minmax(0, 1fr)
+    );
+
+  align-items: center;
+
+  gap: 0;
+
+  padding:
+    8px
+    10px;
+}
+
+.forecastDay {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 2px;
+
+  text-align: center;
+
+  border-right:
+    1px solid
+    rgba(
+      90,
+      90,
+      90,
+      0.18
+    );
+}
+
+.forecastDay:last-child {
+  border-right: none;
+}
+
+.forecastDayName {
+  font-size: 11px;
+  line-height: 1;
+
+  font-weight: 700;
+
+  letter-spacing: 0.04em;
+
+  opacity: 0.7;
+}
+
+.forecastIcon {
+  margin:
+    2px
+    0;
+
+  font-size: 25px;
+  line-height: 1;
+}
+
+.forecastTemps {
+  display: flex;
+
+  align-items: baseline;
+  justify-content: center;
+
+  gap: 3px;
+
+  font-size: 13px;
+  line-height: 1;
+}
+
+.forecastHigh {
+  font-weight: 700;
+}
+
+.forecastLow {
+  opacity: 0.55;
+}
+
+
+/* =========================================================
+   WEATHER LOADING / ERROR
+   ========================================================= */
+
+.weatherLoading,
+.weatherUnavailable {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 14px;
+
+  text-align: center;
+
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   SMALL DISPLAY ADJUSTMENTS
+   ========================================================= */
+
+@media (
+  max-width: 900px
+) {
+  .currentWeather {
+    grid-template-columns:
+      62px
+      minmax(0, 1fr);
+
+    column-gap: 10px;
+
+    padding:
+      10px
+      12px;
+  }
+
+  .weatherIcon {
+    width: 62px;
+    height: 62px;
+
+    font-size: 42px;
+  }
+
+  .temperature {
+    font-size: 42px;
+  }
+
+  .condition {
+    font-size: 16px;
+  }
+
+  .weatherLocation {
+    font-size: 11px;
+  }
+
+  .forecastDays {
+    padding:
+      6px
+      5px;
+  }
+
+  .forecastDayName {
+    font-size: 9px;
+  }
+
+  .forecastIcon {
+    font-size: 20px;
+  }
+
+  .forecastTemps {
+    font-size: 11px;
+  }
+}

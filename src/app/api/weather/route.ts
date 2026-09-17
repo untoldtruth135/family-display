@@ -1,159 +1,154 @@
 import { NextRequest, NextResponse } from "next/server";
 
-type GeocodingResult = {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  elevation?: number;
-  feature_code?: string;
-  country_code?: string;
-  admin1?: string;
-  country?: string;
-  timezone?: string;
-  population?: number;
-};
-
-type GeocodingResponse = {
-  results?: GeocodingResult[];
-};
-
-type CurrentWeather = {
-  time: string;
-  interval: number;
-  temperature_2m: number;
-  weather_code: number;
-};
-
-type DailyWeather = {
-  time: string[];
-  weather_code: number[];
-  temperature_2m_max: number[];
-  temperature_2m_min: number[];
-};
-
-type ForecastResponse = {
-  latitude: number;
-  longitude: number;
-  timezone: string;
-
-  current: CurrentWeather;
-
-  daily: DailyWeather;
-};
+export const dynamic = "force-dynamic";
 
 type WeatherDescription = {
   condition: string;
   icon: string;
 };
 
-function describeWeather(
+function getWeatherDescription(
   code: number
 ): WeatherDescription {
-  switch (code) {
-    case 0:
-      return {
-        condition: "Clear",
-        icon: "☀️",
-      };
-
-    case 1:
-      return {
-        condition: "Mostly clear",
-        icon: "🌤️",
-      };
-
-    case 2:
-      return {
-        condition: "Partly cloudy",
-        icon: "⛅",
-      };
-
-    case 3:
-      return {
-        condition: "Overcast",
-        icon: "☁️",
-      };
-
-    case 45:
-    case 48:
-      return {
-        condition: "Foggy",
-        icon: "🌫️",
-      };
-
-    case 51:
-    case 53:
-    case 55:
-    case 56:
-    case 57:
-      return {
-        condition: "Drizzle",
-        icon: "🌦️",
-      };
-
-    case 61:
-    case 63:
-    case 65:
-    case 66:
-    case 67:
-      return {
-        condition: "Rain",
-        icon: "🌧️",
-      };
-
-    case 71:
-    case 73:
-    case 75:
-    case 77:
-      return {
-        condition: "Snow",
-        icon: "🌨️",
-      };
-
-    case 80:
-    case 81:
-    case 82:
-      return {
-        condition: "Rain showers",
-        icon: "🌦️",
-      };
-
-    case 85:
-    case 86:
-      return {
-        condition: "Snow showers",
-        icon: "🌨️",
-      };
-
-    case 95:
-    case 96:
-    case 99:
-      return {
-        condition: "Thunderstorms",
-        icon: "⛈️",
-      };
-
-    default:
-      return {
-        condition: "Unknown",
-        icon: "☁️",
-      };
+  if (code === 0) {
+    return {
+      condition: "Clear",
+      icon: "☀️",
+    };
   }
+
+  if (code === 1) {
+    return {
+      condition: "Mainly clear",
+      icon: "🌤️",
+    };
+  }
+
+  if (code === 2) {
+    return {
+      condition: "Partly cloudy",
+      icon: "⛅",
+    };
+  }
+
+  if (code === 3) {
+    return {
+      condition: "Overcast",
+      icon: "☁️",
+    };
+  }
+
+  if (
+    code === 45 ||
+    code === 48
+  ) {
+    return {
+      condition: "Fog",
+      icon: "🌫️",
+    };
+  }
+
+  if (
+    code === 51 ||
+    code === 53 ||
+    code === 55
+  ) {
+    return {
+      condition: "Drizzle",
+      icon: "🌦️",
+    };
+  }
+
+  if (
+    code === 56 ||
+    code === 57
+  ) {
+    return {
+      condition: "Freezing drizzle",
+      icon: "🌧️",
+    };
+  }
+
+  if (
+    code === 61 ||
+    code === 63 ||
+    code === 65
+  ) {
+    return {
+      condition: "Rain",
+      icon: "🌧️",
+    };
+  }
+
+  if (
+    code === 66 ||
+    code === 67
+  ) {
+    return {
+      condition: "Freezing rain",
+      icon: "🌧️",
+    };
+  }
+
+  if (
+    code === 71 ||
+    code === 73 ||
+    code === 75 ||
+    code === 77
+  ) {
+    return {
+      condition: "Snow",
+      icon: "❄️",
+    };
+  }
+
+  if (
+    code === 80 ||
+    code === 81 ||
+    code === 82
+  ) {
+    return {
+      condition: "Rain showers",
+      icon: "🌦️",
+    };
+  }
+
+  if (
+    code === 85 ||
+    code === 86
+  ) {
+    return {
+      condition: "Snow showers",
+      icon: "🌨️",
+    };
+  }
+
+  if (
+    code === 95 ||
+    code === 96 ||
+    code === 99
+  ) {
+    return {
+      condition: "Thunderstorm",
+      icon: "⛈️",
+    };
+  }
+
+  return {
+    condition: "Unknown",
+    icon: "🌤️",
+  };
 }
 
 export async function GET(
   request: NextRequest
 ) {
   try {
-    /*
-      Example:
-
-      /api/weather?location=Lynden%2C%20Washington
-    */
+    const searchParams =
+      request.nextUrl.searchParams;
 
     const location =
-      request.nextUrl.searchParams
+      searchParams
         .get("location")
         ?.trim();
 
@@ -161,7 +156,7 @@ export async function GET(
       return NextResponse.json(
         {
           error:
-            "Location is required",
+            "Location is required.",
         },
         {
           status: 400,
@@ -170,62 +165,64 @@ export async function GET(
     }
 
     /*
-      ----------------------------------------
-      STEP 1
-      Convert location name to coordinates
-      ----------------------------------------
+      -------------------------------------------------------
+      GEOCODE LOCATION
+      -------------------------------------------------------
     */
 
-    const geocodingUrl =
+    const geocodeUrl =
       new URL(
         "https://geocoding-api.open-meteo.com/v1/search"
       );
 
-    geocodingUrl.searchParams.set(
+    geocodeUrl.searchParams.set(
       "name",
       location
     );
 
-    geocodingUrl.searchParams.set(
+    geocodeUrl.searchParams.set(
       "count",
       "1"
     );
 
-    geocodingUrl.searchParams.set(
+    geocodeUrl.searchParams.set(
       "language",
       "en"
     );
 
-    geocodingUrl.searchParams.set(
+    geocodeUrl.searchParams.set(
       "format",
       "json"
     );
 
-    const geoResponse =
+    const geocodeResponse =
       await fetch(
-        geocodingUrl.toString(),
+        geocodeUrl.toString(),
         {
           cache: "no-store",
         }
       );
 
-    if (!geoResponse.ok) {
+    if (
+      !geocodeResponse.ok
+    ) {
       throw new Error(
-        `Geocoding request failed: ${geoResponse.status}`
+        `Geocoding request failed with status ${geocodeResponse.status}.`
       );
     }
 
-    const geoData =
-      (await geoResponse.json()) as GeocodingResponse;
+    const geocodeData =
+      await geocodeResponse.json();
 
     const place =
-      geoData.results?.[0];
+      geocodeData
+        ?.results?.[0];
 
     if (!place) {
       return NextResponse.json(
         {
           error:
-            `Location "${location}" was not found`,
+            `Unable to find weather location: ${location}`,
         },
         {
           status: 404,
@@ -234,10 +231,9 @@ export async function GET(
     }
 
     /*
-      ----------------------------------------
-      STEP 2
-      Request current weather + 5-day forecast
-      ----------------------------------------
+      -------------------------------------------------------
+      WEATHER FORECAST
+      -------------------------------------------------------
     */
 
     const forecastUrl =
@@ -247,12 +243,16 @@ export async function GET(
 
     forecastUrl.searchParams.set(
       "latitude",
-      place.latitude.toString()
+      String(
+        place.latitude
+      )
     );
 
     forecastUrl.searchParams.set(
       "longitude",
-      place.longitude.toString()
+      String(
+        place.longitude
+      )
     );
 
     forecastUrl.searchParams.set(
@@ -272,22 +272,10 @@ export async function GET(
       ].join(",")
     );
 
-    /*
-      Display Fahrenheit for now.
-
-      Later we'll use the user's
-      temperature_unit setting from Supabase.
-    */
-
     forecastUrl.searchParams.set(
       "temperature_unit",
       "fahrenheit"
     );
-
-    /*
-      Open-Meteo determines the correct
-      timezone from the requested location.
-    */
 
     forecastUrl.searchParams.set(
       "timezone",
@@ -299,7 +287,7 @@ export async function GET(
       "5"
     );
 
-    const weatherResponse =
+    const forecastResponse =
       await fetch(
         forecastUrl.toString(),
         {
@@ -307,57 +295,109 @@ export async function GET(
         }
       );
 
-    if (!weatherResponse.ok) {
-      throw new Error(
-        `Weather request failed: ${weatherResponse.status}`
-      );
-    }
-
-    const weather =
-      (await weatherResponse.json()) as ForecastResponse;
-
-    /*
-      Basic validation before trying
-      to render the data.
-    */
-
     if (
-      !weather.current ||
-      !weather.daily ||
-      !Array.isArray(
-        weather.daily.time
-      )
+      !forecastResponse.ok
     ) {
       throw new Error(
-        "Weather response did not contain the expected data."
+        `Forecast request failed with status ${forecastResponse.status}.`
       );
     }
 
+    const forecastData =
+      await forecastResponse.json();
+
     /*
-      ----------------------------------------
-      STEP 3
-      Convert WMO weather codes into
-      readable descriptions and icons
-      ----------------------------------------
+      -------------------------------------------------------
+      CURRENT WEATHER
+      -------------------------------------------------------
     */
 
-    const currentDescription =
-      describeWeather(
-        weather.current.weather_code
+    const currentCode =
+      Number(
+        forecastData
+          ?.current
+          ?.weather_code ??
+          0
       );
 
+    const currentDescription =
+      getWeatherDescription(
+        currentCode
+      );
+
+    const current = {
+      temperature:
+        Math.round(
+          Number(
+            forecastData
+              ?.current
+              ?.temperature_2m ??
+              0
+          )
+        ),
+
+      weatherCode:
+        currentCode,
+
+      condition:
+        currentDescription.condition,
+
+      icon:
+        currentDescription.icon,
+    };
+
+    /*
+      -------------------------------------------------------
+      DAILY FORECAST
+      -------------------------------------------------------
+    */
+
+    const dates:
+      string[] =
+      forecastData
+        ?.daily
+        ?.time ??
+      [];
+
+    const weatherCodes:
+      number[] =
+      forecastData
+        ?.daily
+        ?.weather_code ??
+      [];
+
+    const highs:
+      number[] =
+      forecastData
+        ?.daily
+        ?.temperature_2m_max ??
+      [];
+
+    const lows:
+      number[] =
+      forecastData
+        ?.daily
+        ?.temperature_2m_min ??
+      [];
+
     const daily =
-      weather.daily.time.map(
+      dates.map(
         (
-          date: string,
-          index: number
+          date,
+          index
         ) => {
           const code =
-            weather.daily
-              .weather_code[index];
+            Number(
+              weatherCodes[
+                index
+              ] ??
+                0
+            );
 
           const description =
-            describeWeather(code);
+            getWeatherDescription(
+              code
+            );
 
           return {
             date,
@@ -373,79 +413,59 @@ export async function GET(
 
             high:
               Math.round(
-                weather.daily
-                  .temperature_2m_max[
-                  index
-                ]
+                Number(
+                  highs[
+                    index
+                  ] ??
+                    0
+                )
               ),
 
             low:
               Math.round(
-                weather.daily
-                  .temperature_2m_min[
-                  index
-                ]
+                Number(
+                  lows[
+                    index
+                  ] ??
+                    0
+                )
               ),
           };
         }
       );
 
     /*
-      Create a user-friendly location name.
-
-      Example:
-      Lynden, Washington
-    */
-
-    const resolvedLocation =
-      [
-        place.name,
-        place.admin1,
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-    /*
-      ----------------------------------------
-      STEP 4
-      Return a simplified weather object
-      to WeatherPanels.tsx
-      ----------------------------------------
+      -------------------------------------------------------
+      RESPONSE
+      -------------------------------------------------------
     */
 
     return NextResponse.json(
       {
-        location:
-          resolvedLocation,
+        location: {
+          name:
+            place.name,
 
-        latitude:
-          place.latitude,
+          admin1:
+            place.admin1 ??
+            "",
 
-        longitude:
-          place.longitude,
+          country:
+            place.country ??
+            "",
 
-        timezone:
-          weather.timezone,
+          latitude:
+            place.latitude,
 
-        current: {
-          temperature:
-            Math.round(
-              weather.current
-                .temperature_2m
-            ),
+          longitude:
+            place.longitude,
 
-          weatherCode:
-            weather.current
-              .weather_code,
-
-          condition:
-            currentDescription
-              .condition,
-
-          icon:
-            currentDescription
-              .icon,
+          timezone:
+            place.timezone ??
+            forecastData.timezone,
         },
+
+        current,
 
         daily,
       },
@@ -467,7 +487,7 @@ export async function GET(
         error:
           error instanceof Error
             ? error.message
-            : "Unable to load weather data",
+            : "Unable to load weather.",
       },
       {
         status: 500,
