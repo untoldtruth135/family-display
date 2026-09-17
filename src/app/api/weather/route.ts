@@ -1,40 +1,167 @@
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
-export const dynamic = "force-dynamic";
+export const dynamic =
+  "force-dynamic";
 
 type WeatherDescription = {
   condition: string;
   icon: string;
 };
 
+async function fetchWithRetry(
+  url: string,
+  attempts = 3
+) {
+  let lastError:
+    unknown = null;
+
+  for (
+    let attempt = 1;
+    attempt <= attempts;
+    attempt++
+  ) {
+    const controller =
+      new AbortController();
+
+    const timeout =
+      setTimeout(
+        () => {
+          controller.abort();
+        },
+        10_000
+      );
+
+    try {
+      const response =
+        await fetch(
+          url,
+          {
+            cache:
+              "no-store",
+
+            signal:
+              controller.signal,
+
+            headers: {
+              Accept:
+                "application/json",
+            },
+          }
+        );
+
+      clearTimeout(
+        timeout
+      );
+
+      /*
+        Retry temporary
+        upstream failures.
+      */
+
+      if (
+        response.status >=
+          500 &&
+        attempt <
+          attempts
+      ) {
+        await new Promise(
+          (
+            resolve
+          ) =>
+            setTimeout(
+              resolve,
+              500 *
+                attempt
+            )
+        );
+
+        continue;
+      }
+
+      return response;
+    } catch (
+      error
+    ) {
+      clearTimeout(
+        timeout
+      );
+
+      lastError =
+        error;
+
+      if (
+        attempt <
+        attempts
+      ) {
+        await new Promise(
+          (
+            resolve
+          ) =>
+            setTimeout(
+              resolve,
+              500 *
+                attempt
+            )
+        );
+
+        continue;
+      }
+    }
+  }
+
+  if (
+    lastError instanceof
+    Error
+  ) {
+    throw new Error(
+      `Weather provider connection failed after ${attempts} attempts: ${lastError.message}`
+    );
+  }
+
+  throw new Error(
+    `Weather provider connection failed after ${attempts} attempts.`
+  );
+}
+
 function getWeatherDescription(
   code: number
 ): WeatherDescription {
   if (code === 0) {
     return {
-      condition: "Clear",
-      icon: "☀️",
+      condition:
+        "Clear",
+      icon:
+        "☀️",
     };
   }
 
   if (code === 1) {
     return {
-      condition: "Mainly clear",
-      icon: "🌤️",
+      condition:
+        "Mainly clear",
+      icon:
+        "🌤️",
     };
   }
 
   if (code === 2) {
     return {
-      condition: "Partly cloudy",
-      icon: "⛅",
+      condition:
+        "Partly cloudy",
+      icon:
+        "⛅",
     };
   }
 
   if (code === 3) {
     return {
-      condition: "Overcast",
-      icon: "☁️",
+      condition:
+        "Overcast",
+      icon:
+        "☁️",
     };
   }
 
@@ -43,8 +170,10 @@ function getWeatherDescription(
     code === 48
   ) {
     return {
-      condition: "Fog",
-      icon: "🌫️",
+      condition:
+        "Fog",
+      icon:
+        "🌫️",
     };
   }
 
@@ -54,8 +183,10 @@ function getWeatherDescription(
     code === 55
   ) {
     return {
-      condition: "Drizzle",
-      icon: "🌦️",
+      condition:
+        "Drizzle",
+      icon:
+        "🌦️",
     };
   }
 
@@ -64,8 +195,10 @@ function getWeatherDescription(
     code === 57
   ) {
     return {
-      condition: "Freezing drizzle",
-      icon: "🌧️",
+      condition:
+        "Freezing drizzle",
+      icon:
+        "🌧️",
     };
   }
 
@@ -75,8 +208,10 @@ function getWeatherDescription(
     code === 65
   ) {
     return {
-      condition: "Rain",
-      icon: "🌧️",
+      condition:
+        "Rain",
+      icon:
+        "🌧️",
     };
   }
 
@@ -85,8 +220,10 @@ function getWeatherDescription(
     code === 67
   ) {
     return {
-      condition: "Freezing rain",
-      icon: "🌧️",
+      condition:
+        "Freezing rain",
+      icon:
+        "🌧️",
     };
   }
 
@@ -97,8 +234,10 @@ function getWeatherDescription(
     code === 77
   ) {
     return {
-      condition: "Snow",
-      icon: "❄️",
+      condition:
+        "Snow",
+      icon:
+        "❄️",
     };
   }
 
@@ -108,8 +247,10 @@ function getWeatherDescription(
     code === 82
   ) {
     return {
-      condition: "Rain showers",
-      icon: "🌦️",
+      condition:
+        "Rain showers",
+      icon:
+        "🌦️",
     };
   }
 
@@ -118,8 +259,10 @@ function getWeatherDescription(
     code === 86
   ) {
     return {
-      condition: "Snow showers",
-      icon: "🌨️",
+      condition:
+        "Snow showers",
+      icon:
+        "🌨️",
     };
   }
 
@@ -129,14 +272,18 @@ function getWeatherDescription(
     code === 99
   ) {
     return {
-      condition: "Thunderstorm",
-      icon: "⛈️",
+      condition:
+        "Thunderstorm",
+      icon:
+        "⛈️",
     };
   }
 
   return {
-    condition: "Unknown",
-    icon: "🌤️",
+    condition:
+      "Unknown",
+    icon:
+      "🌤️",
   };
 }
 
@@ -144,12 +291,12 @@ export async function GET(
   request: NextRequest
 ) {
   try {
-    const searchParams =
-      request.nextUrl.searchParams;
-
     const location =
-      searchParams
-        .get("location")
+      request.nextUrl
+        .searchParams
+        .get(
+          "location"
+        )
         ?.trim();
 
     if (!location) {
@@ -165,9 +312,9 @@ export async function GET(
     }
 
     /*
-      -------------------------------------------------------
+      =======================================================
       GEOCODE LOCATION
-      -------------------------------------------------------
+      =======================================================
     */
 
     const geocodeUrl =
@@ -196,18 +343,15 @@ export async function GET(
     );
 
     const geocodeResponse =
-      await fetch(
-        geocodeUrl.toString(),
-        {
-          cache: "no-store",
-        }
+      await fetchWithRetry(
+        geocodeUrl.toString()
       );
 
     if (
       !geocodeResponse.ok
     ) {
       throw new Error(
-        `Geocoding request failed with status ${geocodeResponse.status}.`
+        `Geocoding request failed with HTTP ${geocodeResponse.status}.`
       );
     }
 
@@ -231,9 +375,9 @@ export async function GET(
     }
 
     /*
-      -------------------------------------------------------
+      =======================================================
       WEATHER FORECAST
-      -------------------------------------------------------
+      =======================================================
     */
 
     const forecastUrl =
@@ -288,18 +432,15 @@ export async function GET(
     );
 
     const forecastResponse =
-      await fetch(
-        forecastUrl.toString(),
-        {
-          cache: "no-store",
-        }
+      await fetchWithRetry(
+        forecastUrl.toString()
       );
 
     if (
       !forecastResponse.ok
     ) {
       throw new Error(
-        `Forecast request failed with status ${forecastResponse.status}.`
+        `Forecast request failed with HTTP ${forecastResponse.status}.`
       );
     }
 
@@ -307,9 +448,9 @@ export async function GET(
       await forecastResponse.json();
 
     /*
-      -------------------------------------------------------
+      =======================================================
       CURRENT WEATHER
-      -------------------------------------------------------
+      =======================================================
     */
 
     const currentCode =
@@ -340,16 +481,18 @@ export async function GET(
         currentCode,
 
       condition:
-        currentDescription.condition,
+        currentDescription
+          .condition,
 
       icon:
-        currentDescription.icon,
+        currentDescription
+          .icon,
     };
 
     /*
-      -------------------------------------------------------
+      =======================================================
       DAILY FORECAST
-      -------------------------------------------------------
+      =======================================================
     */
 
     const dates:
@@ -406,10 +549,12 @@ export async function GET(
               code,
 
             condition:
-              description.condition,
+              description
+                .condition,
 
             icon:
-              description.icon,
+              description
+                .icon,
 
             high:
               Math.round(
@@ -435,9 +580,9 @@ export async function GET(
       );
 
     /*
-      -------------------------------------------------------
+      =======================================================
       RESPONSE
-      -------------------------------------------------------
+      =======================================================
     */
 
     return NextResponse.json(
@@ -462,7 +607,8 @@ export async function GET(
 
           timezone:
             place.timezone ??
-            forecastData.timezone,
+            forecastData
+              .timezone,
         },
 
         current,
@@ -485,7 +631,8 @@ export async function GET(
     return NextResponse.json(
       {
         error:
-          error instanceof Error
+          error instanceof
+          Error
             ? error.message
             : "Unable to load weather.",
       },

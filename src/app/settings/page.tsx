@@ -10,6 +10,10 @@ import type { User } from "@supabase/supabase-js";
 
 import ScheduleManager from "@/components/ScheduleManager";
 
+import GoogleCalendarConnect from "@/components/GoogleCalendarConnect";
+
+import GoogleCalendarSelector from "@/components/GoogleCalendarSelector";
+
 import BackgroundPhotoManager from "@/components/BackgroundPhotoManager";
 
 import { supabase } from "@/lib/supabase-browser";
@@ -2295,7 +2299,43 @@ export default function SettingsPage() {
   />
 )}
           </section>
+<section
+  className={
+    styles.settingsSection
+  }
+>
+  <div
+    className={
+      styles.sectionHeader
+    }
+  >
+    <h2>
+      Google Calendar
+    </h2>
 
+    <p>
+      Connect Google Calendar,
+      then select which calendars
+      should appear on the family display.
+    </p>
+  </div>
+
+  {householdId && (
+    <>
+      <GoogleCalendarConnect
+        householdId={
+          householdId
+        }
+      />
+
+      <GoogleCalendarSelector
+        householdId={
+          householdId
+        }
+      />
+    </>
+  )}
+</section>
           {/* =================================================
               SCHEDULE
           ================================================= */}
