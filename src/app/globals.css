@@ -14,7 +14,7 @@ body {
 }
 
 body {
-  overflow: hidden;
+  overflow: auto;
 }
 
 button,
@@ -31,6 +31,7 @@ select {
 .dashboard {
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
   padding: 1.4vh;
   display: grid;
 

@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import WeatherPanels from "@/components/WeatherPanels";
 
 type CalendarEvent = {
@@ -10,18 +15,57 @@ type CalendarEvent = {
   type?: "bar" | "dot";
 };
 
+type DisplayConfig = {
+  household: {
+    name: string;
+  };
+
+  display: {
+    weatherLocation: string;
+    timezone: string;
+    temperatureUnit: string;
+    use24HourClock: boolean;
+    theme: string;
+    message: string;
+    messageExpiresAt:
+      | string
+      | null;
+    updatedAt: string;
+  };
+};
+
 const sampleEvents: CalendarEvent[] = [
-  { date: 1, title: "First day of school", type: "bar" },
-  { date: 3, title: "Trash Day", type: "bar" },
+  {
+    date: 1,
+    title: "First day of school",
+    type: "bar",
+  },
+  {
+    date: 3,
+    title: "Trash Day",
+    type: "bar",
+  },
   {
     date: 3,
     title: "Kami violin lesson",
     time: "2:45 PM",
     type: "dot",
   },
-  { date: 5, title: "LHS play auditions", type: "bar" },
-  { date: 7, title: "No school - Labor Day", type: "bar" },
-  { date: 10, title: "Trash Day", type: "bar" },
+  {
+    date: 5,
+    title: "LHS play auditions",
+    type: "bar",
+  },
+  {
+    date: 7,
+    title: "No school - Labor Day",
+    type: "bar",
+  },
+  {
+    date: 10,
+    title: "Trash Day",
+    type: "bar",
+  },
   {
     date: 10,
     title: "Kami violin lesson",
@@ -46,7 +90,11 @@ const sampleEvents: CalendarEvent[] = [
     time: "12:00 PM",
     type: "dot",
   },
-  { date: 18, title: "Daddy - Training", type: "bar" },
+  {
+    date: 18,
+    title: "Daddy - Training",
+    type: "bar",
+  },
   {
     date: 22,
     title: "NCY",
@@ -59,7 +107,11 @@ const sampleEvents: CalendarEvent[] = [
     time: "9:00 AM",
     type: "dot",
   },
-  { date: 24, title: "Trash Day", type: "bar" },
+  {
+    date: 24,
+    title: "Trash Day",
+    type: "bar",
+  },
   {
     date: 24,
     title: "Kami violin lesson",
@@ -68,7 +120,9 @@ const sampleEvents: CalendarEvent[] = [
   },
 ];
 
-function getGreeting(hour: number) {
+function getGreeting(
+  hour: number
+) {
   if (hour < 12) {
     return "Good morning";
   }
@@ -81,94 +135,314 @@ function getGreeting(hour: number) {
 }
 
 export default function Home() {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] =
+    useState(new Date());
 
+  const [
+    displayConfig,
+    setDisplayConfig,
+  ] =
+    useState<DisplayConfig | null>(
+      null
+    );
+
+  const [
+    configError,
+    setConfigError,
+  ] = useState(false);
+
+  /*
+    Update clock every second.
+  */
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () =>
+      clearInterval(timer);
   }, []);
 
+  /*
+    Load settings from Supabase through
+    our secure server API.
+
+    Recheck every 15 seconds so a change
+    made from the phone appears on the
+    wall display automatically.
+  */
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const response = await fetch(
+          "/api/display-config",
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load display configuration."
+          );
+        }
+
+        const data =
+          (await response.json()) as DisplayConfig;
+
+        setDisplayConfig(data);
+        setConfigError(false);
+      } catch (error) {
+        console.error(
+          "Display config error:",
+          error
+        );
+
+        setConfigError(true);
+      }
+    }
+
+    loadConfig();
+
+    const timer = setInterval(
+      loadConfig,
+      15_000
+    );
+
+    return () =>
+      clearInterval(timer);
+  }, []);
+
+  const timezone =
+    displayConfig?.display
+      .timezone ??
+    "America/Los_Angeles";
+
+  const use24HourClock =
+    displayConfig?.display
+      .use24HourClock ??
+    false;
+
+  /*
+    Calendar dates currently use the
+    browser's local time.
+
+    We'll make calendar timezone handling
+    even more rigorous when Google
+    Calendar is connected.
+  */
   const monthData = useMemo(() => {
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const year =
+      now.getFullYear();
 
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const month =
+      now.getMonth();
 
-    const cells: Array<number | null> = [];
+    const firstDay =
+      new Date(
+        year,
+        month,
+        1
+      );
 
-    for (let i = 0; i < firstDay.getDay(); i++) {
+    const lastDay =
+      new Date(
+        year,
+        month + 1,
+        0
+      );
+
+    const cells:
+      Array<number | null> =
+      [];
+
+    for (
+      let i = 0;
+      i < firstDay.getDay();
+      i++
+    ) {
       cells.push(null);
     }
 
-    for (let day = 1; day <= lastDay.getDate(); day++) {
+    for (
+      let day = 1;
+      day <=
+      lastDay.getDate();
+      day++
+    ) {
       cells.push(day);
     }
 
-    while (cells.length % 7 !== 0) {
+    while (
+      cells.length % 7 !== 0
+    ) {
       cells.push(null);
     }
 
     return {
-      monthName: now.toLocaleDateString("en-US", {
-        month: "long",
-      }),
+      monthName:
+        now.toLocaleDateString(
+          "en-US",
+          {
+            month: "long",
+          }
+        ),
+
       year,
+
       cells,
     };
   }, [now]);
 
- const timeParts = now
-  .toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-  .match(/^(.+)\s(AM|PM)$/);
+  const timeString =
+    now.toLocaleTimeString(
+      "en-US",
+      {
+        timeZone: timezone,
 
-const formattedTime = timeParts?.[1] ?? "";
-const meridiem = timeParts?.[2] ?? "";
+        hour: "numeric",
 
-  const formattedDate = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+        minute: "2-digit",
 
-  const today = now.getDate();
+        hour12:
+          !use24HourClock,
+      }
+    );
+
+  let formattedTime =
+    timeString;
+
+  let meridiem = "";
+
+  if (!use24HourClock) {
+    const timeParts =
+      timeString.match(
+        /^(.+)\s(AM|PM)$/
+      );
+
+    formattedTime =
+      timeParts?.[1] ??
+      timeString;
+
+    meridiem =
+      timeParts?.[2] ?? "";
+  }
+
+  const formattedDate =
+    now.toLocaleDateString(
+      "en-US",
+      {
+        timeZone: timezone,
+
+        weekday: "long",
+
+        month: "long",
+
+        day: "numeric",
+      }
+    );
+
+  const localHour =
+    Number(
+      new Intl.DateTimeFormat(
+        "en-US",
+        {
+          timeZone: timezone,
+
+          hour: "numeric",
+
+          hourCycle: "h23",
+        }
+      ).format(now)
+    );
+
+  const today =
+    Number(
+      new Intl.DateTimeFormat(
+        "en-US",
+        {
+          timeZone: timezone,
+
+          day: "numeric",
+        }
+      ).format(now)
+    );
+
+  const weatherLocation =
+    displayConfig?.display
+      .weatherLocation ??
+    "Lynden, Washington";
+
+  let message =
+    displayConfig?.display
+      .message ??
+    "Good will steer, but you must row.";
+
+  /*
+    If we later give a message an
+    expiration time, hide it after
+    that timestamp.
+  */
+  const messageExpiration =
+    displayConfig?.display
+      .messageExpiresAt;
+
+  if (
+    messageExpiration &&
+    new Date(
+      messageExpiration
+    ).getTime() <=
+      now.getTime()
+  ) {
+    message = "";
+  }
 
   return (
     <main className="dashboard">
       <aside className="sidebar">
         <section className="card clockCard">
           <div className="greeting">
-            {getGreeting(now.getHours())}
+            {getGreeting(
+              localHour
+            )}
           </div>
 
           <div className="clock">
-  <span className="clockTime">{formattedTime}</span>
-  <span className="meridiem">{meridiem}</span>
-</div>
+            <span
+              className="clockTime"
+            >
+              {formattedTime}
+            </span>
+
+            {meridiem && (
+              <span
+                className="meridiem"
+              >
+                {meridiem}
+              </span>
+            )}
+          </div>
 
           <div className="date">
             {formattedDate}
           </div>
         </section>
 
-        <WeatherPanels location="Lynden, Washington" />
+        <WeatherPanels
+          location={
+            weatherLocation
+          }
+        />
 
         <section className="card messageCard">
           <div className="messageText">
-            Good will steer,
-            <br />
-            but you must row.
+            {message ||
+              " "}
           </div>
 
           <div className="mountainArt">
             <div className="mountain mountainBack" />
+
             <div className="mountain mountainFront" />
           </div>
         </section>
@@ -178,17 +452,26 @@ const meridiem = timeParts?.[2] ?? "";
         <header className="calendarHeader">
           <div>
             <div className="calendarTitle">
-              {monthData.monthName} {monthData.year}
+              {
+                monthData.monthName
+              }{" "}
+              {monthData.year}
             </div>
 
             <div className="calendarSubtitle">
-              Family Calendar
+              {displayConfig
+                ?.household
+                .name ??
+                "Family Calendar"}
             </div>
           </div>
 
           <div className="headerActions">
             <span className="liveDot" />
-            Live
+
+            {configError
+              ? "Offline"
+              : "Live"}
           </div>
         </header>
 
@@ -201,90 +484,134 @@ const meridiem = timeParts?.[2] ?? "";
             "THU",
             "FRI",
             "SAT",
-          ].map((day) => (
-            <div key={day}>
-              {day}
-            </div>
-          ))}
+          ].map(
+            (day) => (
+              <div
+                key={day}
+              >
+                {day}
+              </div>
+            )
+          )}
         </div>
 
         <div className="calendarGrid">
-          {monthData.cells.map((day, index) => {
-            const events = day
-              ? sampleEvents.filter(
-                  (event) => event.date === day
-                )
-              : [];
+          {monthData.cells.map(
+            (
+              day,
+              index
+            ) => {
+              const events =
+                day
+                  ? sampleEvents.filter(
+                      (
+                        event
+                      ) =>
+                        event.date ===
+                        day
+                    )
+                  : [];
 
-            const isToday = day === today;
+              const isToday =
+                day === today;
 
-            return (
-              <div
-                key={`${day ?? "blank"}-${index}`}
-                className={`calendarCell ${
-                  isToday ? "todayCell" : ""
-                }`}
-              >
-                {day !== null && (
-                  <>
-                    <div
-                      className={`dayNumber ${
-                        isToday ? "todayNumber" : ""
-                      }`}
-                    >
-                      {day}
-                    </div>
+              return (
+                <div
+                  key={`${
+                    day ??
+                    "blank"
+                  }-${index}`}
+                  className={`calendarCell ${
+                    isToday
+                      ? "todayCell"
+                      : ""
+                  }`}
+                >
+                  {day !==
+                    null && (
+                    <>
+                      <div
+                        className={`dayNumber ${
+                          isToday
+                            ? "todayNumber"
+                            : ""
+                        }`}
+                      >
+                        {
+                          day
+                        }
+                      </div>
 
-                    <div className="events">
-                      {events.map(
-                        (event, eventIndex) => {
-                          const eventKey = `${event.title}-${eventIndex}`;
+                      <div className="events">
+                        {events.map(
+                          (
+                            event,
+                            eventIndex
+                          ) => {
+                            const eventKey =
+                              `${event.title}-${eventIndex}`;
 
-                          if (event.type === "bar") {
+                            if (
+                              event.type ===
+                              "bar"
+                            ) {
+                              return (
+                                <div
+                                  className="eventBar"
+                                  key={
+                                    eventKey
+                                  }
+                                >
+                                  {
+                                    event.title
+                                  }
+                                </div>
+                              );
+                            }
+
                             return (
                               <div
-                                className="eventBar"
-                                key={eventKey}
+                                className="eventDot"
+                                key={
+                                  eventKey
+                                }
                               >
-                                {event.title}
+                                <span className="dot" />
+
+                                <div>
+                                  {event.time && (
+                                    <span className="eventTime">
+                                      {
+                                        event.time
+                                      }{" "}
+                                    </span>
+                                  )}
+
+                                  {
+                                    event.title
+                                  }
+                                </div>
                               </div>
                             );
                           }
-
-                          return (
-                            <div
-                              className="eventDot"
-                              key={eventKey}
-                            >
-                              <span className="dot" />
-
-                              <div>
-                                {event.time && (
-                                  <span className="eventTime">
-                                    {event.time}{" "}
-                                  </span>
-                                )}
-
-                                {event.title}
-                              </div>
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            }
+          )}
         </div>
 
         <footer className="calendarFooter">
           <div className="calendarLegend">
             <span className="legendColor blue" />
+
             Family Calendar
 
             <span className="legendColor gray" />
+
             Shared Calendar
           </div>
         </footer>
