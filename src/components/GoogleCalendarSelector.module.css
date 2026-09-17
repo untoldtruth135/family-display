@@ -11,8 +11,12 @@
 
 .header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    flex-start;
 
   gap: 14px;
 }
@@ -45,7 +49,10 @@
   display: flex;
   flex-direction: column;
 
-  border: 1px solid #dce2e6;
+  border:
+    1px solid
+    #dce2e6;
+
   border-radius: 10px;
 
   overflow: hidden;
@@ -55,17 +62,23 @@
 
 .row {
   display: flex;
+
   align-items: center;
-  justify-content: space-between;
+
+  justify-content:
+    space-between;
 
   gap: 16px;
 
   min-height: 58px;
 
-  padding: 10px 14px;
+  padding:
+    10px
+    14px;
 
   border-bottom:
-    1px solid #edf0f2;
+    1px solid
+    #edf0f2;
 }
 
 .row:last-child {
@@ -76,6 +89,7 @@
   flex: 1;
 
   display: flex;
+
   align-items: center;
 
   gap: 11px;
@@ -90,8 +104,27 @@
   flex: 0 0 auto;
 }
 
+.googleColorDot {
+  width: 16px;
+  height: 16px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 1px
+    rgba(
+      0,
+      0,
+      0,
+      0.12
+    );
+}
+
 .calendarName {
   display: flex;
+
   align-items: center;
 
   gap: 8px;
@@ -99,6 +132,7 @@
   color: #30383e;
 
   font-size: 14px;
+
   font-weight: 600;
 }
 
@@ -114,30 +148,38 @@
   color: #1675a8;
 
   font-size: 10px;
+
   font-weight: 700;
 
   text-transform: uppercase;
 }
 
-.colorSection {
+.googleColorInfo {
   display: flex;
+
   align-items: center;
 
-  gap: 8px;
+  gap: 9px;
 }
 
-.colorPicker {
-  width: 36px;
-  height: 32px;
+.googleColorPreview {
+  display: inline-flex;
 
-  padding: 2px;
+  align-items: center;
 
-  border: 1px solid #ccd3d8;
-  border-radius: 7px;
+  justify-content: center;
 
-  background: white;
+  min-width: 56px;
 
-  cursor: pointer;
+  padding:
+    5px
+    9px;
+
+  border-radius: 6px;
+
+  font-size: 11px;
+
+  font-weight: 700;
 }
 
 .colorValue {
@@ -146,11 +188,13 @@
   color: #737d84;
 
   font-family: monospace;
+
   font-size: 11px;
 }
 
 .actions {
   display: flex;
+
   flex-wrap: wrap;
 
   gap: 10px;
@@ -160,9 +204,12 @@
 .refreshButton {
   border-radius: 9px;
 
-  padding: 10px 15px;
+  padding:
+    10px
+    15px;
 
   font-size: 13px;
+
   font-weight: 700;
 
   cursor: pointer;
@@ -172,24 +219,31 @@
   border: none;
 
   background: #169fe8;
+
   color: white;
 }
 
 .refreshButton {
-  border: 1px solid #ccd4d9;
+  border:
+    1px solid
+    #ccd4d9;
 
   background: white;
+
   color: #4f5960;
 }
 
 .saveButton:disabled,
 .refreshButton:disabled {
   opacity: 0.55;
+
   cursor: wait;
 }
 
 .success {
-  padding: 10px 12px;
+  padding:
+    10px
+    12px;
 
   border-radius: 8px;
 
@@ -198,11 +252,14 @@
   color: #25723c;
 
   font-size: 13px;
+
   font-weight: 600;
 }
 
 .error {
-  padding: 10px 12px;
+  padding:
+    10px
+    12px;
 
   border-radius: 8px;
 
@@ -211,6 +268,7 @@
   color: #a52f2f;
 
   font-size: 13px;
+
   font-weight: 600;
 }
 
@@ -220,7 +278,10 @@
 
   padding: 18px;
 
-  border: 1px dashed #ccd4d9;
+  border:
+    1px dashed
+    #ccd4d9;
+
   border-radius: 9px;
 
   background: #f8fafb;
@@ -236,15 +297,19 @@
   max-width: 650px
 ) {
   .row {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
   }
 
-  .colorSection {
+  .googleColorInfo {
     padding-left: 29px;
   }
 
   .header {
-    flex-direction: column;
+    flex-direction:
+      column;
   }
 }

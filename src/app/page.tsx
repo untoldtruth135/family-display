@@ -12,17 +12,11 @@ import {
 
 import WeatherPanels from "@/components/WeatherPanels";
 import RotatingBackground from "@/components/RotatingBackground";
+import AutoScrollEvents from "@/components/AutoScrollEvents";
 
 /* =========================================================
    TYPES
    ========================================================= */
-
-type CalendarEvent = {
-  date: number;
-  title: string;
-  time?: string;
-  type?: "bar" | "dot";
-};
 
 type ScheduleAction =
   | "active"
@@ -36,6 +30,37 @@ type DisplaySchedule = {
   endTime: string;
   action: ScheduleAction;
   enabled: boolean;
+};
+
+type CalendarEvent = {
+  id: string;
+
+  calendarId: string;
+  calendarName: string;
+
+  title: string;
+
+  date: string;
+
+  start: string | null;
+  end: string | null;
+
+  allDay: boolean;
+
+  color: string;
+  textColor: string;
+
+  eventColorId:
+    | string
+    | null;
+
+  usesEventColor: boolean;
+};
+
+type CalendarSource = {
+  id: string;
+  name: string;
+  color: string;
 };
 
 type DisplayConfig = {
@@ -106,114 +131,6 @@ type DisplayConfig = {
 };
 
 /* =========================================================
-   SAMPLE CALENDAR EVENTS
-   =========================================================
-
-   These will be replaced with real Google Calendar
-   events after the Google integration is finished.
-   ========================================================= */
-
-const sampleEvents: CalendarEvent[] = [
-  {
-    date: 1,
-    title: "First day of school",
-    type: "bar",
-  },
-
-  {
-    date: 3,
-    title: "Trash Day",
-    type: "bar",
-  },
-
-  {
-    date: 3,
-    title: "Kami violin lesson",
-    time: "2:45 PM",
-    type: "dot",
-  },
-
-  {
-    date: 5,
-    title: "LHS play auditions",
-    type: "bar",
-  },
-
-  {
-    date: 7,
-    title: "No school - Labor Day",
-    type: "bar",
-  },
-
-  {
-    date: 10,
-    title: "Trash Day",
-    type: "bar",
-  },
-
-  {
-    date: 10,
-    title: "Kami violin lesson",
-    time: "2:45 PM",
-    type: "dot",
-  },
-
-  {
-    date: 12,
-    title: "Whiskey walk",
-    time: "4:00 PM",
-    type: "dot",
-  },
-
-  {
-    date: 15,
-    title: "NCY",
-    time: "6:15 PM",
-    type: "dot",
-  },
-
-  {
-    date: 17,
-    title: "Beth's birthday",
-    time: "12:00 PM",
-    type: "dot",
-  },
-
-  {
-    date: 18,
-    title: "Daddy - Training",
-    type: "bar",
-  },
-
-  {
-    date: 22,
-    title: "NCY",
-    time: "6:15 PM",
-    type: "dot",
-  },
-
-  {
-    date: 23,
-    title: "Ortho",
-    time: "9:00 AM",
-    type: "dot",
-  },
-
-  {
-    date: 24,
-    title: "Trash Day",
-    type: "bar",
-  },
-
-  {
-    date: 24,
-    title: "Kami violin lesson",
-    time: "2:45 PM",
-    type: "dot",
-  },
-];
-
-/* =========================================================
    WEEKDAY MAP
    ========================================================= */
 
@@ -234,6 +151,17 @@ const WEEKDAY_MAP:
 /* =========================================================
    HELPERS
    ========================================================= */
+
+function pad(
+  value: number
+) {
+  return String(
+    value
+  ).padStart(
+    2,
+    "0"
+  );
+}
 
 function getGreeting(
   hour: number
@@ -348,7 +276,10 @@ function timeToMinutes(
     minuteString,
   ] =
     value
-      .slice(0, 5)
+      .slice(
+        0,
+        5
+      )
       .split(":");
 
   return (
@@ -402,10 +333,6 @@ function getScheduleMode(
 
     /*
       Normal same-day schedule.
-
-      Example:
-      Monday
-      08:00 -> 17:00
     */
 
     if (
@@ -424,11 +351,7 @@ function getScheduleMode(
       Overnight schedule.
 
       Example:
-      Monday
-      22:00 -> 06:00
-
-      This remains active Monday
-      night through Tuesday morning.
+      Monday 22:00 -> Tuesday 06:00
     */
 
     else if (
@@ -457,9 +380,8 @@ function getScheduleMode(
     }
 
     /*
-      Same start and end time means
-      the selected day is active
-      for the entire day.
+      Same start/end means
+      all day.
     */
 
     else {
@@ -476,10 +398,7 @@ function getScheduleMode(
   }
 
   /*
-    Overlapping schedules use the
-    most restrictive action.
-
-    Sleep > Dim > Active
+    Most restrictive mode wins.
   */
 
   if (
@@ -501,6 +420,111 @@ function getScheduleMode(
   return "active";
 }
 
+function formatEventTime(
+  isoDate: string,
+  timezone: string,
+  use24HourClock: boolean
+) {
+  return new Date(
+    isoDate
+  ).toLocaleTimeString(
+    "en-US",
+    {
+      timeZone:
+        timezone,
+
+      hour:
+        use24HourClock
+          ? "2-digit"
+          : "numeric",
+
+      minute:
+        "2-digit",
+
+      hourCycle:
+        use24HourClock
+          ? "h23"
+          : "h12",
+    }
+  );
+}
+
+function getContrastText(
+  color: string
+) {
+  const hex =
+    color
+      .replace(
+        "#",
+        ""
+      )
+      .trim();
+
+  if (
+    hex.length !==
+    6
+  ) {
+    return "#ffffff";
+  }
+
+  const red =
+    Number.parseInt(
+      hex.slice(
+        0,
+        2
+      ),
+      16
+    );
+
+  const green =
+    Number.parseInt(
+      hex.slice(
+        2,
+        4
+      ),
+      16
+    );
+
+  const blue =
+    Number.parseInt(
+      hex.slice(
+        4,
+        6
+      ),
+      16
+    );
+
+  if (
+    Number.isNaN(
+      red
+    ) ||
+    Number.isNaN(
+      green
+    ) ||
+    Number.isNaN(
+      blue
+    )
+  ) {
+    return "#ffffff";
+  }
+
+  const luminance =
+    (
+      red *
+        299 +
+      green *
+        587 +
+      blue *
+        114
+    ) /
+    1000;
+
+  return luminance >
+    155
+    ? "#20252a"
+    : "#ffffff";
+}
+
 /* =========================================================
    PAGE
    ========================================================= */
@@ -509,14 +533,6 @@ export default function Home() {
   /*
     ---------------------------------------------------------
     HYDRATION-SAFE CLOCK
-
-    IMPORTANT:
-    We intentionally start at a fixed date rather than
-    new Date().
-
-    This keeps the initial server render and initial browser
-    render identical and prevents the 11:48 / 11:49
-    hydration mismatch we were seeing.
     ---------------------------------------------------------
   */
 
@@ -535,6 +551,12 @@ export default function Home() {
   ] =
     useState(false);
 
+  /*
+    ---------------------------------------------------------
+    DISPLAY CONFIG
+    ---------------------------------------------------------
+  */
+
   const [
     displayConfig,
     setDisplayConfig,
@@ -546,6 +568,40 @@ export default function Home() {
   const [
     configError,
     setConfigError,
+  ] =
+    useState(false);
+
+  /*
+    ---------------------------------------------------------
+    GOOGLE CALENDAR
+    ---------------------------------------------------------
+  */
+
+  const [
+    calendarEvents,
+    setCalendarEvents,
+  ] =
+    useState<
+      CalendarEvent[]
+    >([]);
+
+  const [
+    calendarSources,
+    setCalendarSources,
+  ] =
+    useState<
+      CalendarSource[]
+    >([]);
+
+  const [
+    calendarError,
+    setCalendarError,
+  ] =
+    useState(false);
+
+  const [
+    calendarLoading,
+    setCalendarLoading,
   ] =
     useState(false);
 
@@ -580,7 +636,7 @@ export default function Home() {
   }, []);
 
   /* =======================================================
-     DISPLAY CONFIGURATION
+     DISPLAY CONFIG
      ======================================================= */
 
   useEffect(() => {
@@ -602,7 +658,8 @@ export default function Home() {
           await response
             .json()
             .catch(
-              () => null
+              () =>
+                null
             );
 
         if (
@@ -614,7 +671,9 @@ export default function Home() {
           );
         }
 
-        if (cancelled) {
+        if (
+          cancelled
+        ) {
           return;
         }
 
@@ -766,14 +825,152 @@ export default function Home() {
       timezone
     );
 
+  const currentYear =
+    timezoneParts.year;
+
+  const currentMonth =
+    timezoneParts.month;
+
+  /* =======================================================
+     GOOGLE CALENDAR EVENTS
+     ======================================================= */
+
+  useEffect(() => {
+    if (
+      !mounted ||
+      !displayConfig ||
+      !showCalendar ||
+      currentYear <
+        2000
+    ) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function loadCalendarEvents() {
+      try {
+        setCalendarLoading(
+          true
+        );
+
+        const response =
+          await fetch(
+            `/api/calendar-events?year=${currentYear}&month=${currentMonth}`,
+            {
+              cache:
+                "no-store",
+            }
+          );
+
+        const data =
+          await response
+            .json()
+            .catch(
+              () =>
+                null
+            );
+
+        if (
+          !response.ok
+        ) {
+          throw new Error(
+            data?.error ??
+              "Unable to load Google Calendar events."
+          );
+        }
+
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setCalendarEvents(
+          Array.isArray(
+            data?.events
+          )
+            ? data.events
+            : []
+        );
+
+        setCalendarSources(
+          Array.isArray(
+            data?.calendars
+          )
+            ? data.calendars
+            : []
+        );
+
+        setCalendarError(
+          false
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Calendar events error:",
+          error
+        );
+
+        if (
+          !cancelled
+        ) {
+          setCalendarError(
+            true
+          );
+        }
+      } finally {
+        if (
+          !cancelled
+        ) {
+          setCalendarLoading(
+            false
+          );
+        }
+      }
+    }
+
+    loadCalendarEvents();
+
+    /*
+      Reload Google events every
+      five minutes.
+    */
+
+    const timer =
+      window.setInterval(
+        loadCalendarEvents,
+        5 *
+          60 *
+          1000
+      );
+
+    return () => {
+      cancelled =
+        true;
+
+      window.clearInterval(
+        timer
+      );
+    };
+  }, [
+    mounted,
+    displayConfig?.household.id,
+    showCalendar,
+    currentYear,
+    currentMonth,
+  ]);
+
+  /* =======================================================
+     SCHEDULE
+     ======================================================= */
+
   const currentMinutes =
     timezoneParts.hour *
       60 +
     timezoneParts.minute;
-
-  /* =======================================================
-     SCHEDULE MODE
-     ======================================================= */
 
   const scheduleMode =
     getScheduleMode(
@@ -848,7 +1045,7 @@ export default function Home() {
     );
 
   /* =======================================================
-     MONTH CALENDAR
+     MONTH GRID
      ======================================================= */
 
   const monthData =
@@ -929,7 +1126,13 @@ export default function Home() {
 
       return {
         monthName,
+
         year,
+
+        month:
+          monthIndex +
+          1,
+
         cells,
       };
     }, [
@@ -964,7 +1167,7 @@ export default function Home() {
   }
 
   /* =======================================================
-     SIDEBAR LAYOUT
+     SIDEBAR
      ======================================================= */
 
   const sidebarRows:
@@ -1015,12 +1218,6 @@ export default function Home() {
 
   /* =======================================================
      HYDRATION GUARD
-
-     This is intentionally placed AFTER all hooks,
-     including useMemo.
-
-     React hooks must be called in exactly the same order
-     on every render.
      ======================================================= */
 
   if (!mounted) {
@@ -1113,9 +1310,7 @@ export default function Home() {
               ),
           }}
         >
-          {/* ===============================================
-              CLOCK
-              =============================================== */}
+          {/* CLOCK */}
 
           {showClock && (
             <section className="card clockCard">
@@ -1149,9 +1344,7 @@ export default function Home() {
             </section>
           )}
 
-          {/* ===============================================
-              WEATHER
-              =============================================== */}
+          {/* WEATHER */}
 
           <WeatherPanels
             location={
@@ -1165,9 +1358,7 @@ export default function Home() {
             }
           />
 
-          {/* ===============================================
-              MESSAGE
-              =============================================== */}
+          {/* MESSAGE */}
 
           {showMessage && (
             <section className="card messageCard">
@@ -1189,11 +1380,15 @@ export default function Home() {
       )}
 
       {/* ===================================================
-          CALENDAR
+          GOOGLE CALENDAR
           =================================================== */}
 
       {showCalendar && (
         <section className="calendarPanel">
+          {/* ===============================================
+              HEADER
+              =============================================== */}
+
           <header className="calendarHeader">
             <div>
               <div className="calendarTitle">
@@ -1216,14 +1411,17 @@ export default function Home() {
             <div className="headerActions">
               <span className="liveDot" />
 
-              {configError
-                ? "Offline"
-                : "Live"}
+              {calendarLoading
+                ? "Syncing"
+                : calendarError ||
+                    configError
+                  ? "Offline"
+                  : "Live"}
             </div>
           </header>
 
           {/* ===============================================
-              WEEKDAY HEADERS
+              WEEKDAYS
               =============================================== */}
 
           <div className="weekdayRow">
@@ -1253,7 +1451,7 @@ export default function Home() {
           </div>
 
           {/* ===============================================
-              CALENDAR GRID
+              MONTH GRID
               =============================================== */}
 
           <div className="calendarGrid">
@@ -1264,20 +1462,39 @@ export default function Home() {
                   day,
                   index
                 ) => {
+                  /*
+                    Build the same YYYY-MM-DD
+                    key returned by the
+                    Google event API.
+                  */
+
+                  const dateKey =
+                    day
+                      ? `${monthData.year}-${pad(
+                          monthData.month
+                        )}-${pad(
+                          day
+                        )}`
+                      : "";
+
                   const events =
                     day
-                      ? sampleEvents.filter(
+                      ? calendarEvents.filter(
                           (
                             event
                           ) =>
                             event.date ===
-                            day
+                            dateKey
                         )
                       : [];
 
                   const isToday =
                     day ===
-                    timezoneParts.day;
+                      timezoneParts.day &&
+                    monthData.month ===
+                      timezoneParts.month &&
+                    monthData.year ===
+                      timezoneParts.year;
 
                   return (
                     <div
@@ -1294,6 +1511,8 @@ export default function Home() {
                       {day !==
                         null && (
                         <>
+                          {/* DATE NUMBER */}
+
                           <div
                             className={`dayNumber ${
                               isToday
@@ -1306,25 +1525,48 @@ export default function Home() {
                             }
                           </div>
 
-                          <div className="events">
+                          {/* =================================
+                              AUTOMATIC EVENT SCROLLER
+                              ================================= */}
+
+                          <AutoScrollEvents>
                             {events.map(
                               (
-                                event,
-                                eventIndex
+                                event
                               ) => {
-                                const key =
-                                  `${event.title}-${eventIndex}`;
+                                /*
+                                  -----------------------------
+                                  ALL-DAY EVENT
+
+                                  Uses a full Google-colored bar.
+                                  -----------------------------
+                                */
 
                                 if (
-                                  event.type ===
-                                  "bar"
+                                  event.allDay
                                 ) {
+                                  const textColor =
+                                    event.usesEventColor &&
+                                    event.textColor
+                                      ? event.textColor
+                                      : getContrastText(
+                                          event.color
+                                        );
+
                                   return (
                                     <div
                                       className="eventBar"
                                       key={
-                                        key
+                                        event.id
                                       }
+                                      style={{
+                                        backgroundColor:
+                                          event.color,
+
+                                        color:
+                                          textColor,
+                                      }}
+                                      title={`${event.calendarName}: ${event.title}`}
                                     >
                                       {
                                         event.title
@@ -1333,21 +1575,38 @@ export default function Home() {
                                   );
                                 }
 
+                                /*
+                                  -----------------------------
+                                  TIMED EVENT
+
+                                  Uses the Google color as the dot.
+                                  -----------------------------
+                                */
+
                                 return (
                                   <div
                                     className="eventDot"
                                     key={
-                                      key
+                                      event.id
                                     }
+                                    title={`${event.calendarName}: ${event.title}`}
                                   >
-                                    <span className="dot" />
+                                    <span
+                                      className="dot"
+                                      style={{
+                                        backgroundColor:
+                                          event.color,
+                                      }}
+                                    />
 
                                     <div>
-                                      {event.time && (
+                                      {event.start && (
                                         <span className="eventTime">
-                                          {
-                                            event.time
-                                          }{" "}
+                                          {formatEventTime(
+                                            event.start,
+                                            timezone,
+                                            use24HourClock
+                                          )}{" "}
                                         </span>
                                       )}
 
@@ -1359,7 +1618,7 @@ export default function Home() {
                                 );
                               }
                             )}
-                          </div>
+                          </AutoScrollEvents>
                         </>
                       )}
                     </div>
@@ -1369,18 +1628,67 @@ export default function Home() {
           </div>
 
           {/* ===============================================
-              CALENDAR LEGEND
+              GOOGLE CALENDAR LEGEND
               =============================================== */}
 
           <footer className="calendarFooter">
             <div className="calendarLegend">
-              <span className="legendColor blue" />
+              {calendarSources.length >
+              0 ? (
+                calendarSources.map(
+                  (
+                    calendar
+                  ) => (
+                    <span
+                      key={
+                        calendar.id
+                      }
+                      style={{
+                        display:
+                          "inline-flex",
 
-              Family Calendar
+                        alignItems:
+                          "center",
 
-              <span className="legendColor gray" />
+                        gap:
+                          "5px",
 
-              Shared Calendar
+                        marginRight:
+                          "14px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width:
+                            "10px",
+
+                          height:
+                            "10px",
+
+                          borderRadius:
+                            "50%",
+
+                          flex:
+                            "0 0 auto",
+
+                          backgroundColor:
+                            calendar.color,
+                        }}
+                      />
+
+                      <span>
+                        {
+                          calendar.name
+                        }
+                      </span>
+                    </span>
+                  )
+                )
+              ) : (
+                <span>
+                  No Google calendars selected
+                </span>
+              )}
             </div>
           </footer>
         </section>

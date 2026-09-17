@@ -15,6 +15,7 @@ type GoogleCalendar = {
   id: string;
   name: string;
   color: string;
+  foregroundColor: string;
   primary: boolean;
   selected: boolean;
 };
@@ -30,7 +31,9 @@ export default function GoogleCalendarSelector({
     calendars,
     setCalendars,
   ] =
-    useState<GoogleCalendar[]>([]);
+    useState<
+      GoogleCalendar[]
+    >([]);
 
   const [
     loading,
@@ -81,7 +84,10 @@ export default function GoogleCalendarSelector({
   }
 
   async function loadCalendars() {
-    setLoading(true);
+    setLoading(
+      true
+    );
+
     setError("");
     setNotice("");
 
@@ -132,13 +138,14 @@ export default function GoogleCalendarSelector({
       );
 
       setError(
-        loadError instanceof
-          Error
+        loadError instanceof Error
           ? loadError.message
           : "Unable to load Google calendars."
       );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
@@ -168,33 +175,11 @@ export default function GoogleCalendarSelector({
     setNotice("");
   }
 
-  function changeColor(
-    calendarId: string,
-    color: string
-  ) {
-    setCalendars(
-      (
-        current
-      ) =>
-        current.map(
-          (
-            calendar
-          ) =>
-            calendar.id ===
-            calendarId
-              ? {
-                  ...calendar,
-                  color,
-                }
-              : calendar
-        )
+  async function saveCalendars() {
+    setSaving(
+      true
     );
 
-    setNotice("");
-  }
-
-  async function saveCalendars() {
-    setSaving(true);
     setError("");
     setNotice("");
 
@@ -219,9 +204,6 @@ export default function GoogleCalendarSelector({
 
               name:
                 calendar.name,
-
-              color:
-                calendar.color,
             })
           );
 
@@ -264,14 +246,10 @@ export default function GoogleCalendarSelector({
         );
       }
 
-      setNotice(
-        "Calendar selections saved successfully."
-      );
-
       await loadCalendars();
 
       setNotice(
-        "Calendar selections saved successfully."
+        "Calendar selections and Google colors saved successfully."
       );
     } catch (
       saveError
@@ -282,13 +260,14 @@ export default function GoogleCalendarSelector({
       );
 
       setError(
-        saveError instanceof
-          Error
+        saveError instanceof Error
           ? saveError.message
           : "Unable to save calendar selections."
       );
     } finally {
-      setSaving(false);
+      setSaving(
+        false
+      );
     }
   }
 
@@ -364,9 +343,8 @@ export default function GoogleCalendarSelector({
               styles.subtext
             }
           >
-            Choose which calendars
-            should appear on the
-            family display.
+            Colors are imported
+            directly from Google Calendar.
           </div>
         </div>
 
@@ -418,6 +396,16 @@ export default function GoogleCalendarSelector({
 
                 <span
                   className={
+                    styles.googleColorDot
+                  }
+                  style={{
+                    backgroundColor:
+                      calendar.color,
+                  }}
+                />
+
+                <span
+                  className={
                     styles.calendarName
                   }
                 >
@@ -439,27 +427,23 @@ export default function GoogleCalendarSelector({
 
               <div
                 className={
-                  styles.colorSection
+                  styles.googleColorInfo
                 }
               >
-                <input
-                  type="color"
-                  value={
-                    calendar.color
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    changeColor(
-                      calendar.id,
-                      event.target.value
-                    )
-                  }
+                <span
                   className={
-                    styles.colorPicker
+                    styles.googleColorPreview
                   }
-                  aria-label={`Color for ${calendar.name}`}
-                />
+                  style={{
+                    backgroundColor:
+                      calendar.color,
+
+                    color:
+                      calendar.foregroundColor,
+                  }}
+                >
+                  Google
+                </span>
 
                 <span
                   className={
@@ -510,7 +494,7 @@ export default function GoogleCalendarSelector({
             saving
           }
         >
-          Refresh Calendars
+          Refresh from Google
         </button>
       </div>
 

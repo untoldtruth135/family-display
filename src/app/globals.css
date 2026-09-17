@@ -2058,3 +2058,69 @@ select {
     font-size: 11px;
   }
 }
+
+/* =========================================================
+   AUTOMATIC CALENDAR DAY EVENT SCROLLING
+   ========================================================= */
+
+.calendarCell {
+  position: relative !important;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: hidden !important;
+}
+
+.dayNumber {
+  position: relative;
+
+  z-index: 2;
+}
+
+
+/* Fixed viewing window underneath the date number */
+
+.dayEventsViewport {
+  position: absolute;
+
+  top: 34px;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: hidden;
+
+  pointer-events: none;
+}
+
+
+/* Moving event list */
+
+.dayEventsTrack {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  width: 100%;
+
+  min-width: 0;
+
+  transform: translate3d(0, 0, 0);
+
+  will-change: transform;
+}
+
+
+/* Prevent individual events from collapsing */
+
+.dayEventsTrack .eventBar,
+.dayEventsTrack .eventDot {
+  flex: 0 0 auto;
+
+  min-height: max-content;
+}

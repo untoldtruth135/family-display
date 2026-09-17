@@ -11,6 +11,14 @@ import {
 export const dynamic =
   "force-dynamic";
 
+type GoogleCalendarListEntry = {
+  id?: string;
+  summary?: string;
+  backgroundColor?: string;
+  foregroundColor?: string;
+  primary?: boolean;
+};
+
 async function verifyHousehold(
   request: NextRequest,
   householdId: string
@@ -76,7 +84,9 @@ async function verifyHousehold(
       )
       .maybeSingle();
 
-  if (membershipError) {
+  if (
+    membershipError
+  ) {
     throw new Error(
       membershipError.message
     );
@@ -88,6 +98,48 @@ async function verifyHousehold(
     );
   }
 }
+
+async function getGoogleCalendarList(
+  householdId: string
+) {
+  const accessToken =
+    await getGoogleAccessToken(
+      householdId
+    );
+
+  const response =
+    await fetch(
+      "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&showDeleted=false&showHidden=false",
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ??
+        "Unable to retrieve Google calendars."
+    );
+  }
+
+  return (
+    data.items ??
+    []
+  ) as GoogleCalendarListEntry[];
+}
+
+/* =========================================================
+   GET GOOGLE CALENDARS
+   ========================================================= */
 
 export async function GET(
   request: NextRequest
@@ -118,35 +170,18 @@ export async function GET(
       householdId
     );
 
-    const accessToken =
-      await getGoogleAccessToken(
+    /*
+      Get the live calendar list directly
+      from Google.
+
+      Google's backgroundColor is now
+      the source of truth.
+    */
+
+    const googleCalendars =
+      await getGoogleCalendarList(
         householdId
       );
-
-    const response =
-      await fetch(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&showDeleted=false&showHidden=false",
-        {
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
-          },
-
-          cache:
-            "no-store",
-        }
-      );
-
-    const googleData =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        googleData.error
-          ?.message ??
-          "Unable to retrieve Google calendars."
-      );
-    }
 
     const supabase =
       getServerSupabase();
@@ -162,8 +197,6 @@ export async function GET(
         .select(
           `
           provider_calendar_id,
-          display_name,
-          color,
           enabled
           `
         )
@@ -188,7 +221,9 @@ export async function GET(
           savedSources ??
           []
         ).map(
-          (source) => [
+          (
+            source
+          ) => [
             source.provider_calendar_id,
             source,
           ]
@@ -196,46 +231,68 @@ export async function GET(
       );
 
     const calendars =
-      (
-        googleData.items ??
-        []
-      ).map(
-        (
-          calendar: any
-        ) => {
-          const saved =
-            savedMap.get(
+      googleCalendars
+        .filter(
+          (
+            calendar
+          ) =>
+            Boolean(
               calendar.id
-            );
+            )
+        )
+        .map(
+          (
+            calendar
+          ) => {
+            const id =
+              calendar.id as string;
 
-          return {
-            id:
-              calendar.id,
+            const saved =
+              savedMap.get(
+                id
+              );
 
-            name:
-              calendar.summary ??
-              "Unnamed calendar",
+            return {
+              id,
 
-            color:
-              saved?.color ??
-              calendar.backgroundColor ??
-              "#169FE8",
+              name:
+                calendar.summary ??
+                "Unnamed calendar",
 
-            primary:
-              Boolean(
-                calendar.primary
-              ),
+              /*
+                Actual Google calendar color.
+              */
+              color:
+                calendar.backgroundColor ??
+                "#169FE8",
 
-            selected:
-              saved?.enabled ??
-              false,
-          };
-        }
-      );
+              foregroundColor:
+                calendar.foregroundColor ??
+                "#ffffff",
 
-    return NextResponse.json({
-      calendars,
-    });
+              primary:
+                Boolean(
+                  calendar.primary
+                ),
+
+              selected:
+                saved?.enabled ??
+                false,
+            };
+          }
+        );
+
+    return NextResponse.json(
+      {
+        calendars,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Google calendar list error:",
@@ -256,6 +313,10 @@ export async function GET(
   }
 }
 
+/* =========================================================
+   SAVE SELECTED CALENDARS
+   ========================================================= */
+
 export async function POST(
   request: NextRequest
 ) {
@@ -269,7 +330,7 @@ export async function POST(
           ""
       ).trim();
 
-    const calendars =
+    const selectedCalendars =
       Array.isArray(
         body?.calendars
       )
@@ -293,12 +354,45 @@ export async function POST(
       householdId
     );
 
+    /*
+      Pull the calendars directly from Google
+      again when saving.
+
+      That prevents the browser from supplying
+      an incorrect color.
+    */
+
+    const googleCalendars =
+      await getGoogleCalendarList(
+        householdId
+      );
+
+    const googleMap =
+      new Map(
+        googleCalendars
+          .filter(
+            (
+              calendar
+            ) =>
+              Boolean(
+                calendar.id
+              )
+          )
+          .map(
+            (
+              calendar
+            ) => [
+              calendar.id as string,
+              calendar,
+            ]
+          )
+      );
+
     const supabase =
       getServerSupabase();
 
     /*
-      Disable all existing Google
-      sources first.
+      Disable existing Google calendars.
     */
 
     const {
@@ -327,27 +421,43 @@ export async function POST(
       );
     }
 
+    /*
+      Save selected calendars using
+      Google's actual color.
+    */
+
     for (
       let index = 0;
       index <
-      calendars.length;
+      selectedCalendars.length;
       index++
     ) {
-      const calendar =
-        calendars[
+      const selected =
+        selectedCalendars[
           index
         ];
 
-      if (
-        !calendar?.id ||
-        !calendar?.name
-      ) {
+      const calendarId =
+        String(
+          selected?.id ??
+            ""
+        );
+
+      if (!calendarId) {
+        continue;
+      }
+
+      const googleCalendar =
+        googleMap.get(
+          calendarId
+        );
+
+      if (!googleCalendar) {
         continue;
       }
 
       const {
-        error:
-          upsertError,
+        error: upsertError,
       } =
         await supabase
           .from(
@@ -362,13 +472,18 @@ export async function POST(
                 "google",
 
               provider_calendar_id:
-                calendar.id,
+                calendarId,
 
               display_name:
-                calendar.name,
+                googleCalendar.summary ??
+                selected?.name ??
+                "Unnamed calendar",
 
+              /*
+                Google's calendar color.
+              */
               color:
-                calendar.color ??
+                googleCalendar.backgroundColor ??
                 "#169FE8",
 
               enabled:
