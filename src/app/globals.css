@@ -2332,3 +2332,23 @@ select {
     font-size: 11px;
   }
 }
+
+/* =========================================================
+   DASHBOARD TEXT - BLACK
+   ========================================================= */
+
+.greeting,
+.date,
+.meridiem,
+.condition,
+.weatherLocation,
+.weatherRange,
+.forecastDayName,
+.forecastLow,
+.forecastHigh,
+.calendarSubtitle,
+.weekdayRow,
+.calendarLegend,
+.eventTime {
+  color: #111111 !important;
+}
