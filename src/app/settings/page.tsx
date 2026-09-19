@@ -8,6 +8,8 @@ import {
 
 import type { User } from "@supabase/supabase-js";
 
+import DisplayPairingManager from "@/components/DisplayPairingManager";
+
 import ScheduleManager from "@/components/ScheduleManager";
 
 import GoogleCalendarConnect from "@/components/GoogleCalendarConnect";
@@ -1837,7 +1839,18 @@ export default function SettingsPage() {
               }
             />
           </section>
-
+          
+{displayId &&
+  deviceCode && (
+    <DisplayPairingManager
+      displayId={
+        displayId
+      }
+      deviceCode={
+        deviceCode
+      }
+    />
+  )}
           {/* =================================================
               APPEARANCE
           ================================================= */}

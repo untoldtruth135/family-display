@@ -4,18 +4,24 @@ import {
 } from "next/server";
 
 import {
+  randomUUID,
+} from "crypto";
+
+import {
   getGoogleAccessToken,
-  getServerSupabase,
 } from "@/lib/google-calendar-server";
+
+import {
+  getPairedDisplay,
+  getDisplayServerSupabase,
+} from "@/lib/display-auth-server";
 
 export const dynamic =
   "force-dynamic";
 
 type GoogleEvent = {
   id?: string;
-
   summary?: string;
-
   colorId?: string;
 
   start?: {
@@ -39,6 +45,14 @@ type GoogleColorsResponse = {
     string,
     GoogleColorEntry
   >;
+};
+
+type GoogleEventsResponse = {
+  items?: GoogleEvent[];
+
+  error?: {
+    message?: string;
+  };
 };
 
 function pad(
@@ -76,10 +90,12 @@ function addDays(
 
   return [
     date.getUTCFullYear(),
+
     pad(
       date.getUTCMonth() +
         1
     ),
+
     pad(
       date.getUTCDate()
     ),
@@ -95,30 +111,21 @@ function getLocalDateKey(
       "en-US",
       {
         timeZone,
-
-        year:
-          "numeric",
-
-        month:
-          "2-digit",
-
-        day:
-          "2-digit",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
       }
     );
 
   const parts =
     formatter.formatToParts(
-      new Date(
-        dateTime
-      )
+      new Date(dateTime)
     );
 
-  const values:
-    Record<
-      string,
-      string
-    > = {};
+  const values: Record<
+    string,
+    string
+  > = {};
 
   for (
     const part of parts
@@ -141,22 +148,52 @@ export async function GET(
   request: NextRequest
 ) {
   try {
+    /*
+      =====================================================
+      VERIFY THAT THIS BROWSER IS A PAIRED DISPLAY
+      =====================================================
+    */
+
+    const display =
+      await getPairedDisplay(
+        request
+      );
+
+    if (!display) {
+      return NextResponse.json(
+        {
+          error:
+            "Display is not paired.",
+        },
+        {
+          status: 401,
+
+          headers: {
+            "Cache-Control":
+              "no-store",
+          },
+        }
+      );
+    }
+
+    /*
+      =====================================================
+      VALIDATE REQUESTED YEAR / MONTH
+      =====================================================
+    */
+
     const year =
       Number(
         request.nextUrl
           .searchParams
-          .get(
-            "year"
-          )
+          .get("year")
       );
 
     const month =
       Number(
         request.nextUrl
           .searchParams
-          .get(
-            "month"
-          )
+          .get("month")
       );
 
     if (
@@ -180,122 +217,31 @@ export async function GET(
       );
     }
 
-    const supabase =
-      getServerSupabase();
-
     /*
-      =======================================================
-      HOUSEHOLD
-      =======================================================
-
-      Temporary development behavior:
-      use the first household.
-
-      We will replace this later with the
-      display-token/device pairing system.
+      =====================================================
+      USE THE PAIRED DISPLAY'S HOUSEHOLD
+      =====================================================
     */
 
-    const {
-      data: households,
-      error:
-        householdError,
-    } =
-      await supabase
-        .from(
-          "households"
-        )
-        .select(
-          `
-          id,
-          created_at
-          `
-        )
-        .order(
-          "created_at",
-          {
-            ascending:
-              true,
-          }
-        )
-        .limit(1);
-
-    if (householdError) {
-      throw new Error(
-        `Household query failed: ${householdError.message}`
-      );
-    }
-
-    const household =
-      households?.[0];
-
-    if (!household) {
-      throw new Error(
-        "No household was found."
-      );
-    }
-
-    /*
-      =======================================================
-      DISPLAY TIMEZONE
-      =======================================================
-    */
-
-    const {
-      data: displays,
-      error:
-        displayError,
-    } =
-      await supabase
-        .from(
-          "displays"
-        )
-        .select(
-          `
-          id,
-          timezone,
-          created_at
-          `
-        )
-        .eq(
-          "household_id",
-          household.id
-        )
-        .eq(
-          "enabled",
-          true
-        )
-        .order(
-          "created_at",
-          {
-            ascending:
-              true,
-          }
-        )
-        .limit(1);
-
-    if (displayError) {
-      throw new Error(
-        `Display query failed: ${displayError.message}`
-      );
-    }
-
-    const display =
-      displays?.[0];
+    const householdId =
+      display.household_id;
 
     const timeZone =
-      display?.timezone ??
+      display.timezone ??
       "America/Los_Angeles";
 
+    const supabase =
+      getDisplayServerSupabase();
+
     /*
-      =======================================================
-      ENABLED GOOGLE CALENDARS
-      =======================================================
+      =====================================================
+      LOAD ONLY ENABLED GOOGLE CALENDARS FOR THIS HOUSEHOLD
+      =====================================================
     */
 
     const {
       data: sources,
-      error:
-        sourceError,
+      error: sourceError,
     } =
       await supabase
         .from(
@@ -312,7 +258,7 @@ export async function GET(
         )
         .eq(
           "household_id",
-          household.id
+          householdId
         )
         .eq(
           "provider",
@@ -325,8 +271,7 @@ export async function GET(
         .order(
           "sort_order",
           {
-            ascending:
-              true,
+            ascending: true,
           }
         );
 
@@ -336,10 +281,13 @@ export async function GET(
       );
     }
 
+    /*
+      No calendars selected is valid.
+    */
+
     if (
       !sources ||
-      sources.length ===
-        0
+      sources.length === 0
     ) {
       return NextResponse.json(
         {
@@ -356,20 +304,20 @@ export async function GET(
     }
 
     /*
-      =======================================================
+      =====================================================
       GOOGLE ACCESS TOKEN
-      =======================================================
+      =====================================================
     */
 
     const accessToken =
       await getGoogleAccessToken(
-        household.id
+        householdId
       );
 
     /*
-      =======================================================
-      GOOGLE EVENT COLOR TABLE
-      =======================================================
+      =====================================================
+      GOOGLE EVENT COLOR PALETTE
+      =====================================================
     */
 
     const colorsResponse =
@@ -403,13 +351,12 @@ export async function GET(
       {};
 
     /*
-      =======================================================
-      MONTH RANGE
-      =======================================================
+      =====================================================
+      MONTH DATE RANGE
 
-      Query one day beyond each edge so
-      timezone differences cannot hide
-      events near midnight.
+      We include one extra day on either side to avoid
+      timezone edge cases near midnight.
+      =====================================================
     */
 
     const timeMin =
@@ -443,33 +390,46 @@ export async function GET(
         month
       )}-`;
 
-    const outputEvents:
-      Array<{
-        id: string;
-        calendarId: string;
-        calendarName: string;
+    /*
+      =====================================================
+      OUTPUT EVENT TYPE
+      =====================================================
+    */
 
-        title: string;
+    const outputEvents: Array<{
+      id: string;
 
-        date: string;
+      calendarId: string;
+      calendarName: string;
 
-        start: string | null;
-        end: string | null;
+      title: string;
 
-        allDay: boolean;
+      date: string;
 
-        color: string;
-        textColor: string;
+      start:
+        | string
+        | null;
 
-        eventColorId: string | null;
+      end:
+        | string
+        | null;
 
-        usesEventColor: boolean;
-      }> = [];
+      allDay: boolean;
+
+      color: string;
+      textColor: string;
+
+      eventColorId:
+        | string
+        | null;
+
+      usesEventColor: boolean;
+    }> = [];
 
     /*
-      =======================================================
-      LOAD EACH SELECTED CALENDAR
-      =======================================================
+      =====================================================
+      FETCH EVENTS FROM EACH SELECTED CALENDAR
+      =====================================================
     */
 
     for (
@@ -539,8 +499,8 @@ export async function GET(
         );
 
       const eventData =
-        await eventResponse
-          .json();
+        (await eventResponse.json()) as
+          GoogleEventsResponse;
 
       if (
         !eventResponse.ok
@@ -553,29 +513,34 @@ export async function GET(
         );
       }
 
-      const googleEvents:
-        GoogleEvent[] =
+      const googleEvents =
         eventData.items ??
         [];
+
+      /*
+        ===================================================
+        PROCESS EACH GOOGLE EVENT
+        ===================================================
+      */
 
       for (
         const event of googleEvents
       ) {
         const eventId =
           event.id ??
-          crypto.randomUUID();
+          randomUUID();
 
         const title =
           event.summary ??
           "(No title)";
 
         /*
-          -----------------------------------------------
+          -------------------------------------------------
           COLOR PRIORITY
 
-          1. Individual Google event color
-          2. Google calendar color
-          -----------------------------------------------
+          1. Google event-specific color
+          2. Parent Google calendar color
+          -------------------------------------------------
         */
 
         const eventColor =
@@ -586,26 +551,35 @@ export async function GET(
             : undefined;
 
         const resolvedColor =
-          eventColor
-            ?.background ??
+          eventColor?.background ??
           calendarColor;
 
         const resolvedTextColor =
-          eventColor
-            ?.foreground ??
+          eventColor?.foreground ??
           "#ffffff";
 
         const usesEventColor =
           Boolean(
             event.colorId &&
-            eventColor
-              ?.background
+              eventColor
+                ?.background
           );
 
         /*
-          -----------------------------------------------
-          ALL-DAY EVENTS
-          -----------------------------------------------
+          =================================================
+          ALL-DAY EVENT
+          =================================================
+
+          Google uses an exclusive end date.
+
+          Example:
+
+          start.date = September 10
+          end.date   = September 12
+
+          Event occupies:
+          September 10
+          September 11
         */
 
         if (
@@ -613,10 +587,6 @@ export async function GET(
         ) {
           const startDate =
             event.start.date;
-
-          /*
-            Google end.date is exclusive.
-          */
 
           const exclusiveEnd =
             event.end?.date ??
@@ -634,8 +604,7 @@ export async function GET(
           while (
             currentDate <
               exclusiveEnd &&
-            safety <
-              366
+            safety < 366
           ) {
             if (
               currentDate.startsWith(
@@ -694,9 +663,9 @@ export async function GET(
         }
 
         /*
-          -----------------------------------------------
-          TIMED EVENTS
-          -----------------------------------------------
+          =================================================
+          TIMED EVENT
+          =================================================
         */
 
         if (
@@ -709,6 +678,11 @@ export async function GET(
                 .dateTime,
               timeZone
             );
+
+          /*
+            Ignore events that fall outside the requested
+            month after timezone conversion.
+          */
 
           if (
             !dateKey.startsWith(
@@ -763,9 +737,13 @@ export async function GET(
     }
 
     /*
-      =======================================================
+      =====================================================
       SORT EVENTS
-      =======================================================
+
+      Date first
+      All-day before timed
+      Then timed events by start time
+      =====================================================
     */
 
     outputEvents.sort(
@@ -781,10 +759,6 @@ export async function GET(
             second.date
           );
         }
-
-        /*
-          All-day events first.
-        */
 
         if (
           first.allDay !==
@@ -806,18 +780,16 @@ export async function GET(
     );
 
     /*
-      =======================================================
+      =====================================================
       RESPONSE
-      =======================================================
+      =====================================================
     */
 
     return NextResponse.json(
       {
         calendars:
           sources.map(
-            (
-              source
-            ) => ({
+            (source) => ({
               id:
                 source.provider_calendar_id,
 
@@ -855,6 +827,11 @@ export async function GET(
       },
       {
         status: 500,
+
+        headers: {
+          "Cache-Control":
+            "no-store",
+        },
       }
     );
   }

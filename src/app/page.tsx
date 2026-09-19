@@ -662,14 +662,17 @@ export default function Home() {
                 null
             );
 
-        if (
-          !response.ok
-        ) {
-          throw new Error(
-            data?.error ??
-              "Unable to load display configuration."
-          );
-        }
+if (response.status === 401) {
+  window.location.replace("/pair");
+  return;
+}
+
+if (!response.ok) {
+  throw new Error(
+    data?.error ??
+      "Unable to load display configuration."
+  );
+}
 
         if (
           cancelled

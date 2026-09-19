@@ -1,211 +1,153 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import {
+  getPairedDisplay,
+  getDisplayServerSupabase,
+} from "@/lib/display-auth-server";
 
 export const dynamic = "force-dynamic";
 
 const BUCKET = "background-photos";
 
-export async function GET() {
+export async function GET(
+  request: NextRequest
+) {
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-    const serverKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ??
-      process.env.SUPABASE_SECRET_KEY;
-
-    if (!supabaseUrl) {
-      throw new Error(
-        "NEXT_PUBLIC_SUPABASE_URL is not configured."
-      );
-    }
-
-    if (!serverKey) {
-      throw new Error(
-        "Supabase server key is not configured."
-      );
-    }
-
-    const supabase = createClient(
-      supabaseUrl,
-      serverKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
-
     // -----------------------------------------------------
-    // 1. Find the household
+    // VERIFY THIS BROWSER IS A PAIRED DISPLAY
     // -----------------------------------------------------
 
-    const {
-      data: household,
-      error: householdError,
-    } = await supabase
-      .from("households")
-      .select("id")
-      .order("created_at", {
-        ascending: true,
-      })
-      .limit(1)
-      .maybeSingle();
-
-    if (householdError) {
-      throw new Error(
-        `Household query failed: ${householdError.message}`
-      );
-    }
-
-    if (!household) {
-      return NextResponse.json({
-        photos: [],
-      });
-    }
-
-    // -----------------------------------------------------
-    // 2. Find the first enabled display
-    // -----------------------------------------------------
-
-    const {
-      data: display,
-      error: displayError,
-    } = await supabase
-      .from("displays")
-      .select("id")
-      .eq(
-        "household_id",
-        household.id
-      )
-      .eq(
-        "enabled",
-        true
-      )
-      .order("created_at", {
-        ascending: true,
-      })
-      .limit(1)
-      .maybeSingle();
-
-    if (displayError) {
-      throw new Error(
-        `Display query failed: ${displayError.message}`
-      );
-    }
+    const display =
+      await getPairedDisplay(request);
 
     if (!display) {
-      return NextResponse.json({
-        photos: [],
-      });
+      return NextResponse.json(
+        {
+          error:
+            "Display is not paired.",
+        },
+        {
+          status: 401,
+          headers: {
+            "Cache-Control":
+              "no-store",
+          },
+        }
+      );
     }
 
+    const supabase =
+      getDisplayServerSupabase();
+
     // -----------------------------------------------------
-    // 3. Load enabled household photos
+    // LOAD ENABLED PHOTOS FOR THIS HOUSEHOLD
     // -----------------------------------------------------
 
     const {
       data: photoRows,
-      error: photosError,
-    } = await supabase
-      .from("background_photos")
-      .select(
-        `
-        id,
-        display_id,
-        storage_path,
-        file_name,
-        sort_order,
-        enabled
-        `
-      )
-      .eq(
-        "household_id",
-        household.id
-      )
-      .eq(
-        "enabled",
-        true
-      )
-      .order("sort_order", {
-        ascending: true,
-      });
+      error: photoError,
+    } =
+      await supabase
+        .from("background_photos")
+        .select(
+          `
+          id,
+          household_id,
+          display_id,
+          storage_path,
+          file_name,
+          enabled,
+          sort_order,
+          created_at
+          `
+        )
+        .eq(
+          "household_id",
+          display.household_id
+        )
+        .eq(
+          "enabled",
+          true
+        )
+        .order(
+          "sort_order",
+          {
+            ascending: true,
+          }
+        )
+        .order(
+          "created_at",
+          {
+            ascending: true,
+          }
+        );
 
-    if (photosError) {
+    if (photoError) {
       throw new Error(
-        `Background photo query failed: ${photosError.message}`
+        `Background photo query failed: ${photoError.message}`
       );
     }
 
-    /*
-      Keep:
-      - photos assigned to this display
-      - household-wide photos where display_id is null
+    // Household-wide photos have display_id = null.
+    // Display-specific photos must match this display.
 
-      Filtering here avoids possible PostgREST .or() parsing issues.
-    */
-
-    const applicablePhotos =
+    const matchingPhotos =
       (photoRows ?? []).filter(
         (photo) =>
-          photo.display_id === display.id ||
+          photo.display_id ===
+            display.id ||
           photo.display_id === null
       );
 
     // -----------------------------------------------------
-    // 4. Generate temporary URLs for private photos
+    // CREATE TEMPORARY SIGNED URLS
     // -----------------------------------------------------
 
-    const signedPhotos = await Promise.all(
-      applicablePhotos.map(
-        async (photo) => {
-          const {
-            data: signedData,
-            error: signedError,
-          } = await supabase.storage
-            .from(BUCKET)
-            .createSignedUrl(
-              photo.storage_path,
-              60 * 60
-            );
+    const photos: Array<{
+      id: string;
+      fileName: string;
+      url: string;
+    }> = [];
 
-          if (signedError) {
-            console.error(
-              `Unable to sign ${photo.storage_path}:`,
-              signedError
-            );
+    for (
+      const photo of matchingPhotos
+    ) {
+      const {
+        data: signedUrlData,
+        error: signedUrlError,
+      } =
+        await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(
+            photo.storage_path,
+            60 * 60
+          );
 
-            return null;
-          }
+      if (signedUrlError) {
+        console.error(
+          `Unable to sign background ${photo.id}:`,
+          signedUrlError
+        );
+        continue;
+      }
 
-          if (!signedData?.signedUrl) {
-            return null;
-          }
+      if (
+        !signedUrlData?.signedUrl
+      ) {
+        continue;
+      }
 
-          return {
-            id: photo.id,
-
-            fileName:
-              photo.file_name,
-
-            url:
-              signedData.signedUrl,
-          };
-        }
-      )
-    );
-
-    const photos =
-      signedPhotos.filter(
-        (
-          photo
-        ): photo is {
-          id: string;
-          fileName: string | null;
-          url: string;
-        } => photo !== null
-      );
+      photos.push({
+        id: photo.id,
+        fileName:
+          photo.file_name,
+        url:
+          signedUrlData.signedUrl,
+      });
+    }
 
     return NextResponse.json(
       {
@@ -220,7 +162,7 @@ export async function GET() {
     );
   } catch (error) {
     console.error(
-      "Background photo API error:",
+      "Background API error:",
       error
     );
 
@@ -229,10 +171,14 @@ export async function GET() {
         error:
           error instanceof Error
             ? error.message
-            : "Unknown background photo error.",
+            : "Unable to load background photos.",
       },
       {
         status: 500,
+        headers: {
+          "Cache-Control":
+            "no-store",
+        },
       }
     );
   }

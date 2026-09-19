@@ -1,39 +1,50 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
-export const dynamic = "force-dynamic";
+import {
+  getPairedDisplay,
+  getDisplayServerSupabase,
+} from "@/lib/display-auth-server";
 
-export async function GET() {
+export const dynamic =
+  "force-dynamic";
+
+export async function GET(
+  request: NextRequest
+) {
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+    /*
+      -------------------------------------------------------
+      VERIFY PAIRED DISPLAY
+      -------------------------------------------------------
+    */
 
-    const serverKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ??
-      process.env.SUPABASE_SECRET_KEY;
-
-    if (!supabaseUrl) {
-      throw new Error(
-        "NEXT_PUBLIC_SUPABASE_URL is not configured."
+    const display =
+      await getPairedDisplay(
+        request
       );
-    }
 
-    if (!serverKey) {
-      throw new Error(
-        "Supabase server key is not configured."
-      );
-    }
-
-    const supabase = createClient(
-      supabaseUrl,
-      serverKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
+    if (!display) {
+      return NextResponse.json(
+        {
+          error:
+            "Display is not paired.",
         },
-      }
-    );
+        {
+          status: 401,
+
+          headers: {
+            "Cache-Control":
+              "no-store",
+          },
+        }
+      );
+    }
+
+    const supabase =
+      getDisplayServerSupabase();
 
     /*
       -------------------------------------------------------
@@ -42,24 +53,22 @@ export async function GET() {
     */
 
     const {
-      data: households,
+      data: household,
       error: householdError,
-    } = await supabase
-      .from("households")
-      .select(
-        `
-        id,
-        name,
-        created_at
-        `
-      )
-      .order(
-        "created_at",
-        {
-          ascending: true,
-        }
-      )
-      .limit(1);
+    } =
+      await supabase
+        .from("households")
+        .select(
+          `
+          id,
+          name
+          `
+        )
+        .eq(
+          "id",
+          display.household_id
+        )
+        .maybeSingle();
 
     if (householdError) {
       throw new Error(
@@ -67,112 +76,42 @@ export async function GET() {
       );
     }
 
-    const household =
-      households?.[0];
-
     if (!household) {
       throw new Error(
-        "No household was found."
+        "The paired display household could not be found."
       );
     }
 
     /*
       -------------------------------------------------------
-      HOUSEHOLD DISPLAY SETTINGS
+      DISPLAY SETTINGS
       -------------------------------------------------------
     */
 
     const {
       data: settings,
       error: settingsError,
-    } = await supabase
-      .from(
-        "display_settings"
-      )
-      .select(
-        `
-        weather_location,
-        current_message,
-        message_expires_at
-        `
-      )
-      .eq(
-        "household_id",
-        household.id
-      )
-      .maybeSingle();
+    } =
+      await supabase
+        .from(
+          "display_settings"
+        )
+        .select(
+          `
+          weather_location,
+          current_message,
+          message_expires_at
+          `
+        )
+        .eq(
+          "household_id",
+          display.household_id
+        )
+        .maybeSingle();
 
     if (settingsError) {
       throw new Error(
         `Display settings query failed: ${settingsError.message}`
-      );
-    }
-
-    /*
-      -------------------------------------------------------
-      DISPLAY
-      -------------------------------------------------------
-    */
-
-    const {
-      data: displays,
-      error: displayError,
-    } = await supabase
-      .from("displays")
-      .select(
-        `
-        id,
-        name,
-        enabled,
-        orientation,
-        timezone,
-        use_24_hour_clock,
-        theme,
-        font_family,
-        accent_color,
-        card_opacity,
-        show_clock,
-        show_weather,
-        show_forecast,
-        show_calendar,
-        show_message,
-        background_enabled,
-        background_interval_seconds,
-        background_shuffle,
-        background_fit,
-        background_overlay_opacity,
-        touch_controls_enabled,
-        created_at
-        `
-      )
-      .eq(
-        "household_id",
-        household.id
-      )
-      .eq(
-        "enabled",
-        true
-      )
-      .order(
-        "created_at",
-        {
-          ascending: true,
-        }
-      )
-      .limit(1);
-
-    if (displayError) {
-      throw new Error(
-        `Display query failed: ${displayError.message}`
-      );
-    }
-
-    const display =
-      displays?.[0];
-
-    if (!display) {
-      throw new Error(
-        "No enabled display was found."
       );
     }
 
@@ -185,40 +124,41 @@ export async function GET() {
     const {
       data: scheduleRows,
       error: scheduleError,
-    } = await supabase
-      .from(
-        "display_schedules"
-      )
-      .select(
-        `
-        id,
-        day_of_week,
-        start_time,
-        end_time,
-        action,
-        enabled
-        `
-      )
-      .eq(
-        "display_id",
-        display.id
-      )
-      .eq(
-        "enabled",
-        true
-      )
-      .order(
-        "day_of_week",
-        {
-          ascending: true,
-        }
-      )
-      .order(
-        "start_time",
-        {
-          ascending: true,
-        }
-      );
+    } =
+      await supabase
+        .from(
+          "display_schedules"
+        )
+        .select(
+          `
+          id,
+          day_of_week,
+          start_time,
+          end_time,
+          action,
+          enabled
+          `
+        )
+        .eq(
+          "display_id",
+          display.id
+        )
+        .eq(
+          "enabled",
+          true
+        )
+        .order(
+          "day_of_week",
+          {
+            ascending: true,
+          }
+        )
+        .order(
+          "start_time",
+          {
+            ascending: true,
+          }
+        );
 
     if (scheduleError) {
       throw new Error(
@@ -231,7 +171,9 @@ export async function GET() {
         scheduleRows ??
         []
       ).map(
-        (schedule) => ({
+        (
+          schedule
+        ) => ({
           id:
             schedule.id,
 
@@ -373,6 +315,11 @@ export async function GET() {
       },
       {
         status: 500,
+
+        headers: {
+          "Cache-Control":
+            "no-store",
+        },
       }
     );
   }
