@@ -64,14 +64,9 @@ function getServerSupabase() {
   HASH DISPLAY TOKEN
   =========================================================
 
-  The browser receives the real secret token.
+  The browser stores the real secret in an HTTP-only cookie.
 
-  Supabase stores only:
-
-      SHA-256(secret token)
-
-  This means the actual browser credential is not stored
-  in the display_pairings table.
+  Supabase stores only its SHA-256 hash.
   =========================================================
 */
 
@@ -83,28 +78,6 @@ export function hashDisplayToken(
   )
     .update(token)
     .digest("hex");
-}
-
-
-/*
-  =========================================================
-  UUID CHECK
-
-  This is only needed during migration from our original
-  single-device display_token architecture.
-
-  The old displays.display_token column is UUID.
-
-  Future pairing tokens do not need to be UUIDs.
-  =========================================================
-*/
-
-function looksLikeUuid(
-  value: string
-) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
 }
 
 
@@ -132,7 +105,6 @@ async function loadDisplay(
         household_id,
         name,
         device_code,
-        token_version,
         enabled,
         orientation,
         timezone,
@@ -177,14 +149,11 @@ async function loadDisplay(
 
 /*
   =========================================================
-  UPDATE LAST-SEEN TIME
+  UPDATE LAST SEEN
   =========================================================
 
-  The dashboard calls several private APIs.
-
-  We do not want every individual API request to cause a
-  database write, so last_seen_at is updated at most about
-  once every five minutes.
+  Update at most once every five minutes so normal dashboard
+  polling does not create excessive database writes.
   =========================================================
 */
 
@@ -253,184 +222,16 @@ async function touchPairing(
 
 /*
   =========================================================
-  MIGRATE LEGACY PAIRED DISPLAY
-  =========================================================
-
-  Our old system stored the active browser token directly
-  in:
-
-      displays.display_token
-
-  If a browser still has one of those valid tokens, we
-  automatically create a display_pairings record for it.
-
-  This allows the currently working wall display to survive
-  the migration without forcing another pairing.
-  =========================================================
-*/
-
-async function migrateLegacyToken(
-  token: string,
-  tokenHash: string
-) {
-  /*
-    Old display_token values are UUIDs.
-
-    If this is not a UUID, it cannot be a valid legacy
-    token, so do not query the UUID column.
-  */
-
-  if (
-    !looksLikeUuid(
-      token
-    )
-  ) {
-    return null;
-  }
-
-  const supabase =
-    getServerSupabase();
-
-  const {
-    data: legacyDisplay,
-    error:
-      legacyError,
-  } =
-    await supabase
-      .from("displays")
-      .select(
-        `
-        id,
-        household_id,
-        name,
-        device_code,
-        token_version,
-        enabled,
-        orientation,
-        timezone,
-        use_24_hour_clock,
-        theme,
-        font_family,
-        accent_color,
-        card_opacity,
-        show_clock,
-        show_weather,
-        show_forecast,
-        show_calendar,
-        show_message,
-        background_enabled,
-        background_interval_seconds,
-        background_shuffle,
-        background_fit,
-        background_overlay_opacity,
-        touch_controls_enabled,
-        paired_at
-        `
-      )
-      .eq(
-        "display_token",
-        token
-      )
-      .eq(
-        "enabled",
-        true
-      )
-      .maybeSingle();
-
-  if (legacyError) {
-    throw new Error(
-      `Legacy display authentication failed: ${legacyError.message}`
-    );
-  }
-
-  if (!legacyDisplay) {
-    return null;
-  }
-
-  const now =
-    new Date().toISOString();
-
-  /*
-    Insert the migration record.
-
-    token_hash is UNIQUE, so upsert makes this safe if two
-    requests arrive at nearly the same time.
-  */
-
-  const {
-    data: pairing,
-    error:
-      pairingError,
-  } =
-    await supabase
-      .from(
-        "display_pairings"
-      )
-      .upsert(
-        {
-          display_id:
-            legacyDisplay.id,
-
-          device_name:
-            "Existing paired device",
-
-          token_hash:
-            tokenHash,
-
-          paired_at:
-            legacyDisplay
-              .paired_at ??
-            now,
-
-          last_seen_at:
-            now,
-
-          revoked_at:
-            null,
-        },
-        {
-          onConflict:
-            "token_hash",
-        }
-      )
-      .select(
-        `
-        id,
-        device_name,
-        paired_at,
-        last_seen_at,
-        revoked_at
-        `
-      )
-      .single();
-
-  if (pairingError) {
-    throw new Error(
-      `Legacy pairing migration failed: ${pairingError.message}`
-    );
-  }
-
-  return {
-    ...legacyDisplay,
-
-    pairing_id:
-      pairing.id,
-
-    pairing_device_name:
-      pairing.device_name,
-
-    pairing_paired_at:
-      pairing.paired_at,
-
-    pairing_last_seen_at:
-      pairing.last_seen_at,
-  };
-}
-
-
-/*
-  =========================================================
   AUTHENTICATE PAIRED DISPLAY
+  =========================================================
+
+  There is no legacy displays.display_token fallback.
+
+  Every display browser must have an active row in:
+
+      display_pairings
+
+  with a matching SHA-256 token hash.
   =========================================================
 */
 
@@ -453,22 +254,6 @@ export async function getPairedDisplay(
 
   const supabase =
     getServerSupabase();
-
-  /*
-    -------------------------------------------------------
-    CHECK NEW MULTI-DEVICE PAIRING TABLE
-    -------------------------------------------------------
-
-    We intentionally query the pairing even if revoked.
-
-    Why?
-
-    If a pairing has been revoked, we need to know that the
-    hash existed and was revoked.
-
-    Otherwise the legacy migration fallback could
-    accidentally recreate a revoked device.
-  */
 
   const {
     data: pairing,
@@ -501,78 +286,55 @@ export async function getPairedDisplay(
     );
   }
 
-  /*
-    -------------------------------------------------------
-    KNOWN TOKEN
-    -------------------------------------------------------
-  */
-
-  if (pairing) {
-    /*
-      A revoked token must never fall through to the legacy
-      migration path.
-    */
-
-    if (
-      pairing.revoked_at
-    ) {
-      return null;
-    }
-
-    const display =
-      await loadDisplay(
-        pairing.display_id
-      );
-
-    if (!display) {
-      return null;
-    }
-
-    await touchPairing(
-      pairing.id,
-      pairing.last_seen_at
-    );
-
-    return {
-      ...display,
-
-      pairing_id:
-        pairing.id,
-
-      pairing_device_name:
-        pairing.device_name,
-
-      pairing_paired_at:
-        pairing.paired_at,
-
-      pairing_last_seen_at:
-        pairing.last_seen_at,
-    };
+  if (!pairing) {
+    return null;
   }
 
   /*
-    -------------------------------------------------------
-    LEGACY MIGRATION FALLBACK
-    -------------------------------------------------------
-
-    No display_pairings record exists for this token.
-
-    Check whether it is a valid token from the original
-    single-device system.
-
-    If yes, migrate it automatically.
+    Revoked pairings must never authenticate.
   */
 
-  return migrateLegacyToken(
-    token,
-    tokenHash
+  if (
+    pairing.revoked_at
+  ) {
+    return null;
+  }
+
+  const display =
+    await loadDisplay(
+      pairing.display_id
+    );
+
+  if (!display) {
+    return null;
+  }
+
+  await touchPairing(
+    pairing.id,
+    pairing.last_seen_at
   );
+
+  return {
+    ...display,
+
+    pairing_id:
+      pairing.id,
+
+    pairing_device_name:
+      pairing.device_name,
+
+    pairing_paired_at:
+      pairing.paired_at,
+
+    pairing_last_seen_at:
+      pairing.last_seen_at,
+  };
 }
 
 
 /*
   =========================================================
-  EXPORTED SERVER SUPABASE CLIENT
+  EXPORTED SERVICE CLIENT
   =========================================================
 */
 
