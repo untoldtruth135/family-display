@@ -10,31 +10,22 @@ import {
   supabase,
 } from "@/lib/supabase-browser";
 
-
 type Props = {
   displayId: string;
   deviceCode: string;
 };
-
 
 type PairingRow = {
   id: string;
   display_id: string;
   device_name: string;
   paired_at: string;
-  last_seen_at:
-    | string
-    | null;
-  revoked_at:
-    | string
-    | null;
+  last_seen_at: string | null;
+  revoked_at: string | null;
 };
 
-
 function formatDate(
-  value:
-    | string
-    | null
+  value: string | null
 ) {
   if (!value) {
     return "Never";
@@ -63,21 +54,15 @@ function formatDate(
   );
 }
 
-
 function formatLastSeen(
-  value:
-    | string
-    | null
+  value: string | null
 ) {
   if (!value) {
     return "Never";
   }
 
-  const date =
-    new Date(value);
-
   const time =
-    date.getTime();
+    new Date(value).getTime();
 
   if (
     Number.isNaN(time)
@@ -97,18 +82,14 @@ function formatLastSeen(
   const day =
     24 * hour;
 
-
   if (
-    difference <
-    minute
+    difference < minute
   ) {
     return "Just now";
   }
 
-
   if (
-    difference <
-    hour
+    difference < hour
   ) {
     const minutes =
       Math.floor(
@@ -123,10 +104,8 @@ function formatLastSeen(
     } ago`;
   }
 
-
   if (
-    difference <
-    day
+    difference < day
   ) {
     const hours =
       Math.floor(
@@ -140,7 +119,6 @@ function formatLastSeen(
         : "s"
     } ago`;
   }
-
 
   const days =
     Math.floor(
@@ -156,12 +134,8 @@ function formatLastSeen(
     } ago`;
   }
 
-
-  return formatDate(
-    value
-  );
+  return formatDate(value);
 }
-
 
 export default function DisplayPairingManager({
   displayId,
@@ -173,7 +147,6 @@ export default function DisplayPairingManager({
   ] =
     useState(false);
 
-
   const [
     pairingExpiresAt,
     setPairingExpiresAt,
@@ -181,7 +154,6 @@ export default function DisplayPairingManager({
     useState<
       string | null
     >(null);
-
 
   const [
     pairings,
@@ -191,13 +163,11 @@ export default function DisplayPairingManager({
       PairingRow[]
     >([]);
 
-
   const [
     busy,
     setBusy,
   ] =
     useState(false);
-
 
   const [
     loadingDevices,
@@ -205,13 +175,11 @@ export default function DisplayPairingManager({
   ] =
     useState(true);
 
-
   const [
     notice,
     setNotice,
   ] =
     useState("");
-
 
   const [
     error,
@@ -219,10 +187,23 @@ export default function DisplayPairingManager({
   ] =
     useState("");
 
+  const [
+    renamingId,
+    setRenamingId,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    renameValue,
+    setRenameValue,
+  ] =
+    useState("");
 
   /*
     ========================================================
-    LOAD DISPLAY PAIRING STATE + DEVICE LIST
+    LOAD STATE
     ========================================================
   */
 
@@ -232,9 +213,6 @@ export default function DisplayPairingManager({
         setLoadingDevices(
           true
         );
-
-        setError("");
-
 
         const [
           displayResult,
@@ -286,7 +264,6 @@ export default function DisplayPairingManager({
             ]
           );
 
-
         if (
           displayResult.error
         ) {
@@ -302,32 +279,28 @@ export default function DisplayPairingManager({
               ?.pairing_expires_at ??
             null;
 
-          const actuallyEnabled =
+          const active =
             Boolean(
               displayResult
                 .data
                 ?.pairing_enabled
             ) &&
-            Boolean(
-              expires
-            ) &&
+            Boolean(expires) &&
             new Date(
               expires as string
             ).getTime() >
               Date.now();
 
-
           setPairingEnabled(
-            actuallyEnabled
+            active
           );
 
           setPairingExpiresAt(
-            actuallyEnabled
+            active
               ? expires
               : null
           );
         }
-
 
         if (
           pairingResult.error
@@ -348,7 +321,6 @@ export default function DisplayPairingManager({
           );
         }
 
-
         setLoadingDevices(
           false
         );
@@ -358,7 +330,6 @@ export default function DisplayPairingManager({
       ]
     );
 
-
   useEffect(
     () => {
       void loadState();
@@ -367,7 +338,6 @@ export default function DisplayPairingManager({
       loadState,
     ]
   );
-
 
   /*
     ========================================================
@@ -380,7 +350,6 @@ export default function DisplayPairingManager({
     setNotice("");
     setError("");
 
-
     const expiresAt =
       new Date(
         Date.now() +
@@ -388,7 +357,6 @@ export default function DisplayPairingManager({
             60 *
             1000
       ).toISOString();
-
 
     const {
       error:
@@ -410,7 +378,6 @@ export default function DisplayPairingManager({
           displayId
         );
 
-
     if (updateError) {
       setError(
         updateError.message
@@ -420,7 +387,6 @@ export default function DisplayPairingManager({
 
       return;
     }
-
 
     setPairingEnabled(
       true
@@ -437,7 +403,6 @@ export default function DisplayPairingManager({
     setBusy(false);
   }
 
-
   /*
     ========================================================
     DISABLE PAIRING
@@ -448,7 +413,6 @@ export default function DisplayPairingManager({
     setBusy(true);
     setNotice("");
     setError("");
-
 
     const {
       error:
@@ -470,7 +434,6 @@ export default function DisplayPairingManager({
           displayId
         );
 
-
     if (updateError) {
       setError(
         updateError.message
@@ -480,7 +443,6 @@ export default function DisplayPairingManager({
 
       return;
     }
-
 
     setPairingEnabled(
       false
@@ -497,6 +459,110 @@ export default function DisplayPairingManager({
     setBusy(false);
   }
 
+  /*
+    ========================================================
+    RENAME DEVICE
+    ========================================================
+  */
+
+  function beginRename(
+    pairing:
+      PairingRow
+  ) {
+    setRenamingId(
+      pairing.id
+    );
+
+    setRenameValue(
+      pairing.device_name
+    );
+
+    setNotice("");
+    setError("");
+  }
+
+  function cancelRename() {
+    setRenamingId(
+      null
+    );
+
+    setRenameValue("");
+  }
+
+  async function saveRename(
+    pairing:
+      PairingRow
+  ) {
+    const cleanedName =
+      renameValue
+        .trim()
+        .replace(
+          /\s+/g,
+          " "
+        );
+
+    if (!cleanedName) {
+      setError(
+        "Device name cannot be empty."
+      );
+
+      return;
+    }
+
+    if (
+      cleanedName.length >
+      80
+    ) {
+      setError(
+        "Device name cannot exceed 80 characters."
+      );
+
+      return;
+    }
+
+    setBusy(true);
+    setNotice("");
+    setError("");
+
+    const {
+      error:
+        renameError,
+    } =
+      await supabase.rpc(
+        "rename_display_pairing_device",
+        {
+          target_pairing_id:
+            pairing.id,
+
+          new_device_name:
+            cleanedName,
+        }
+      );
+
+    if (renameError) {
+      setError(
+        renameError.message
+      );
+
+      setBusy(false);
+
+      return;
+    }
+
+    setRenamingId(
+      null
+    );
+
+    setRenameValue("");
+
+    setNotice(
+      `Device renamed to "${cleanedName}".`
+    );
+
+    await loadState();
+
+    setBusy(false);
+  }
 
   /*
     ========================================================
@@ -510,19 +576,16 @@ export default function DisplayPairingManager({
   ) {
     const confirmed =
       window.confirm(
-        `Revoke "${pairing.device_name}"?\n\nThis device will immediately lose access to the Family Display. Other paired devices will remain connected.`
+        `Revoke "${pairing.device_name}"?\n\nThis device will immediately lose access. Other paired devices will remain connected.`
       );
-
 
     if (!confirmed) {
       return;
     }
 
-
     setBusy(true);
     setNotice("");
     setError("");
-
 
     const {
       error:
@@ -536,7 +599,6 @@ export default function DisplayPairingManager({
         }
       );
 
-
     if (revokeError) {
       setError(
         revokeError.message
@@ -547,21 +609,18 @@ export default function DisplayPairingManager({
       return;
     }
 
-
     setNotice(
       `${pairing.device_name} was revoked.`
     );
-
 
     await loadState();
 
     setBusy(false);
   }
 
-
   /*
     ========================================================
-    REVOKE ALL DEVICES
+    REVOKE ALL
     ========================================================
   */
 
@@ -571,16 +630,13 @@ export default function DisplayPairingManager({
         "Revoke all paired devices?\n\nEvery TV, tablet, and browser currently paired with this display will immediately lose access."
       );
 
-
     if (!confirmed) {
       return;
     }
 
-
     setBusy(true);
     setNotice("");
     setError("");
-
 
     const {
       error:
@@ -594,7 +650,6 @@ export default function DisplayPairingManager({
         }
       );
 
-
     if (revokeError) {
       setError(
         revokeError.message
@@ -604,7 +659,6 @@ export default function DisplayPairingManager({
 
       return;
     }
-
 
     setPairingEnabled(
       false
@@ -618,16 +672,14 @@ export default function DisplayPairingManager({
       "All paired devices have been revoked."
     );
 
-
     await loadState();
 
     setBusy(false);
   }
 
-
   /*
     ========================================================
-    REVOKE ALL + OPEN NEW PAIRING WINDOW
+    REVOKE ALL + REPAIR
     ========================================================
   */
 
@@ -637,16 +689,13 @@ export default function DisplayPairingManager({
         "Revoke all devices and start over?\n\nEvery currently paired device will immediately lose access. A new 10-minute pairing window will then open."
       );
 
-
     if (!confirmed) {
       return;
     }
 
-
     setBusy(true);
     setNotice("");
     setError("");
-
 
     const {
       error:
@@ -660,7 +709,6 @@ export default function DisplayPairingManager({
         }
       );
 
-
     if (repairError) {
       setError(
         repairError.message
@@ -671,11 +719,9 @@ export default function DisplayPairingManager({
       return;
     }
 
-
     setPairingEnabled(
       true
     );
-
 
     setPairingExpiresAt(
       new Date(
@@ -686,24 +732,20 @@ export default function DisplayPairingManager({
       ).toISOString()
     );
 
-
     setNotice(
       "All previous devices were revoked. Pairing is enabled for 10 minutes."
     );
-
 
     await loadState();
 
     setBusy(false);
   }
 
-
   const activePairings =
     pairings.filter(
       (pairing) =>
         !pairing.revoked_at
     );
-
 
   return (
     <div
@@ -741,7 +783,6 @@ export default function DisplayPairingManager({
         Device pairing code
       </div>
 
-
       <div
         style={{
           fontFamily:
@@ -763,7 +804,6 @@ export default function DisplayPairingManager({
         {deviceCode}
       </div>
 
-
       <div
         style={{
           fontSize:
@@ -776,11 +816,9 @@ export default function DisplayPairingManager({
             "16px",
         }}
       >
-        Use this code on
-        the display pairing
-        page.
+        Use this code on the
+        display pairing page.
       </div>
-
 
       {/* PAIRING WINDOW */}
 
@@ -802,33 +840,10 @@ export default function DisplayPairingManager({
         {!pairingEnabled ? (
           <button
             type="button"
-            disabled={
-              busy
-            }
+            disabled={busy}
             onClick={
               enablePairing
             }
-            style={{
-              padding:
-                "10px 14px",
-
-              borderRadius:
-                "8px",
-
-              border:
-                "1px solid #b8c2c8",
-
-              background:
-                "#ffffff",
-
-              cursor:
-                busy
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                600,
-            }}
           >
             {busy
               ? "Please wait..."
@@ -837,40 +852,16 @@ export default function DisplayPairingManager({
         ) : (
           <button
             type="button"
-            disabled={
-              busy
-            }
+            disabled={busy}
             onClick={
               disablePairing
             }
-            style={{
-              padding:
-                "10px 14px",
-
-              borderRadius:
-                "8px",
-
-              border:
-                "1px solid #b8c2c8",
-
-              background:
-                "#ffffff",
-
-              cursor:
-                busy
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                600,
-            }}
           >
             {busy
               ? "Please wait..."
               : "Disable Pairing"}
           </button>
         )}
-
 
         {pairingEnabled &&
           pairingExpiresAt && (
@@ -891,7 +882,6 @@ export default function DisplayPairingManager({
             </span>
           )}
       </div>
-
 
       {/* PAIRED DEVICES */}
 
@@ -964,7 +954,6 @@ export default function DisplayPairingManager({
             </div>
           </div>
 
-
           <button
             type="button"
             disabled={
@@ -974,28 +963,6 @@ export default function DisplayPairingManager({
             onClick={() =>
               void loadState()
             }
-            style={{
-              padding:
-                "7px 10px",
-
-              borderRadius:
-                "7px",
-
-              border:
-                "1px solid #b8c2c8",
-
-              background:
-                "#ffffff",
-
-              cursor:
-                "pointer",
-
-              fontSize:
-                "12px",
-
-              fontWeight:
-                600,
-            }}
           >
             {loadingDevices
               ? "Loading..."
@@ -1003,46 +970,14 @@ export default function DisplayPairingManager({
           </button>
         </div>
 
-
         {loadingDevices ? (
-          <div
-            style={{
-              padding:
-                "14px 0",
-
-              color:
-                "#67727a",
-
-              fontSize:
-                "13px",
-            }}
-          >
+          <div>
             Loading paired
             devices...
           </div>
         ) : pairings.length ===
           0 ? (
-          <div
-            style={{
-              padding:
-                "14px",
-
-              border:
-                "1px dashed #cbd5da",
-
-              borderRadius:
-                "8px",
-
-              color:
-                "#67727a",
-
-              fontSize:
-                "13px",
-
-              background:
-                "#ffffff",
-            }}
-          >
+          <div>
             No devices have
             been paired yet.
           </div>
@@ -1066,6 +1001,9 @@ export default function DisplayPairingManager({
                 const active =
                   !pairing.revoked_at;
 
+                const isRenaming =
+                  renamingId ===
+                  pairing.id;
 
                 return (
                   <div
@@ -1091,37 +1029,243 @@ export default function DisplayPairingManager({
                           : 0.65,
                     }}
                   >
-                    <div
-                      style={{
-                        display:
-                          "flex",
+                    {isRenaming ? (
+                      <div>
+                        <div
+                          style={{
+                            fontSize:
+                              "12px",
 
-                        justifyContent:
-                          "space-between",
+                            fontWeight:
+                              700,
 
-                        alignItems:
-                          "flex-start",
+                            marginBottom:
+                              "6px",
+                          }}
+                        >
+                          Device name
+                        </div>
 
-                        gap:
-                          "12px",
+                        <input
+                          type="text"
+                          value={
+                            renameValue
+                          }
+                          maxLength={
+                            80
+                          }
+                          autoFocus
+                          onChange={(
+                            event
+                          ) =>
+                            setRenameValue(
+                              event
+                                .target
+                                .value
+                            )
+                          }
+                          onKeyDown={(
+                            event
+                          ) => {
+                            if (
+                              event.key ===
+                              "Enter"
+                            ) {
+                              event.preventDefault();
 
-                        flexWrap:
-                          "wrap",
-                      }}
-                    >
-                      <div
-                        style={{
-                          minWidth:
-                            0,
-                        }}
-                      >
+                              void saveRename(
+                                pairing
+                              );
+                            }
+
+                            if (
+                              event.key ===
+                              "Escape"
+                            ) {
+                              cancelRename();
+                            }
+                          }}
+                          style={{
+                            width:
+                              "100%",
+
+                            maxWidth:
+                              "420px",
+
+                            boxSizing:
+                              "border-box",
+
+                            padding:
+                              "9px 10px",
+
+                            border:
+                              "1px solid #b8c2c8",
+
+                            borderRadius:
+                              "7px",
+
+                            marginBottom:
+                              "9px",
+                          }}
+                        />
+
                         <div
                           style={{
                             display:
                               "flex",
 
-                            alignItems:
-                              "center",
+                            gap:
+                              "8px",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            disabled={
+                              busy
+                            }
+                            onClick={() =>
+                              void saveRename(
+                                pairing
+                              )
+                            }
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={
+                              busy
+                            }
+                            onClick={
+                              cancelRename
+                            }
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display:
+                            "flex",
+
+                          justifyContent:
+                            "space-between",
+
+                          alignItems:
+                            "flex-start",
+
+                          gap:
+                            "12px",
+
+                          flexWrap:
+                            "wrap",
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              display:
+                                "flex",
+
+                              alignItems:
+                                "center",
+
+                              gap:
+                                "8px",
+
+                              flexWrap:
+                                "wrap",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight:
+                                  700,
+                              }}
+                            >
+                              {
+                                pairing.device_name
+                              }
+                            </div>
+
+                            <span
+                              style={{
+                                padding:
+                                  "3px 7px",
+
+                                borderRadius:
+                                  "999px",
+
+                                fontSize:
+                                  "11px",
+
+                                fontWeight:
+                                  700,
+
+                                background:
+                                  active
+                                    ? "#ecfdf3"
+                                    : "#f2f4f7",
+
+                                color:
+                                  active
+                                    ? "#027a48"
+                                    : "#667085",
+                              }}
+                            >
+                              {active
+                                ? "Active"
+                                : "Revoked"}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop:
+                                "8px",
+
+                              fontSize:
+                                "12px",
+
+                              lineHeight:
+                                1.6,
+
+                              color:
+                                "#67727a",
+                            }}
+                          >
+                            <div>
+                              Paired:{" "}
+                              {formatDate(
+                                pairing.paired_at
+                              )}
+                            </div>
+
+                            <div>
+                              Last seen:{" "}
+                              {formatLastSeen(
+                                pairing.last_seen_at
+                              )}
+                            </div>
+
+                            {pairing.revoked_at && (
+                              <div>
+                                Revoked:{" "}
+                                {formatDate(
+                                  pairing.revoked_at
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
 
                             gap:
                               "8px",
@@ -1130,140 +1274,45 @@ export default function DisplayPairingManager({
                               "wrap",
                           }}
                         >
-                          <div
-                            style={{
-                              fontWeight:
-                                700,
-
-                              overflowWrap:
-                                "anywhere",
-                            }}
-                          >
-                            {
-                              pairing.device_name
+                          <button
+                            type="button"
+                            disabled={
+                              busy
                             }
-                          </div>
-
-
-                          <span
-                            style={{
-                              display:
-                                "inline-block",
-
-                              padding:
-                                "3px 7px",
-
-                              borderRadius:
-                                "999px",
-
-                              fontSize:
-                                "11px",
-
-                              fontWeight:
-                                700,
-
-                              background:
-                                active
-                                  ? "#ecfdf3"
-                                  : "#f2f4f7",
-
-                              color:
-                                active
-                                  ? "#027a48"
-                                  : "#667085",
-                            }}
+                            onClick={() =>
+                              beginRename(
+                                pairing
+                              )
+                            }
                           >
-                            {active
-                              ? "Active"
-                              : "Revoked"}
-                          </span>
-                        </div>
+                            Rename
+                          </button>
 
+                          {active && (
+                            <button
+                              type="button"
+                              disabled={
+                                busy
+                              }
+                              onClick={() =>
+                                void revokeDevice(
+                                  pairing
+                                )
+                              }
+                              style={{
+                                color:
+                                  "#b42318",
 
-                        <div
-                          style={{
-                            marginTop:
-                              "8px",
-
-                            fontSize:
-                              "12px",
-
-                            lineHeight:
-                              1.6,
-
-                            color:
-                              "#67727a",
-                          }}
-                        >
-                          <div>
-                            Paired:{" "}
-                            {formatDate(
-                              pairing.paired_at
-                            )}
-                          </div>
-
-                          <div>
-                            Last seen:{" "}
-                            {formatLastSeen(
-                              pairing.last_seen_at
-                            )}
-                          </div>
-
-                          {pairing.revoked_at && (
-                            <div>
-                              Revoked:{" "}
-                              {formatDate(
-                                pairing.revoked_at
-                              )}
-                            </div>
+                                fontWeight:
+                                  700,
+                              }}
+                            >
+                              Revoke
+                            </button>
                           )}
                         </div>
                       </div>
-
-
-                      {active && (
-                        <button
-                          type="button"
-                          disabled={
-                            busy
-                          }
-                          onClick={() =>
-                            void revokeDevice(
-                              pairing
-                            )
-                          }
-                          style={{
-                            padding:
-                              "8px 11px",
-
-                            borderRadius:
-                              "7px",
-
-                            border:
-                              "1px solid #b42318",
-
-                            background:
-                              "#ffffff",
-
-                            color:
-                              "#b42318",
-
-                            cursor:
-                              busy
-                                ? "not-allowed"
-                                : "pointer",
-
-                            fontWeight:
-                              700,
-
-                            fontSize:
-                              "12px",
-                          }}
-                        >
-                          Revoke
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               }
@@ -1271,7 +1320,6 @@ export default function DisplayPairingManager({
           </div>
         )}
       </div>
-
 
       {/* DISPLAY SECURITY */}
 
@@ -1299,14 +1347,10 @@ export default function DisplayPairingManager({
           Display Security
         </div>
 
-
         <div
           style={{
             fontSize:
               "13px",
-
-            lineHeight:
-              1.5,
 
             color:
               "#67727a",
@@ -1315,15 +1359,11 @@ export default function DisplayPairingManager({
               "12px",
           }}
         >
-          You can revoke one
-          device above without
-          affecting the others.
-          Use these controls only
-          when you want to revoke
+          Revoke individual
+          devices above, or revoke
           every device associated
           with this display.
         </div>
-
 
         <div
           style={{
@@ -1347,75 +1387,21 @@ export default function DisplayPairingManager({
             onClick={
               revokeDisplay
             }
-            style={{
-              padding:
-                "10px 14px",
-
-              borderRadius:
-                "8px",
-
-              border:
-                "1px solid #b42318",
-
-              background:
-                "#ffffff",
-
-              color:
-                "#b42318",
-
-              cursor:
-                busy
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                700,
-            }}
           >
             Revoke All Devices
           </button>
 
-
           <button
             type="button"
-            disabled={
-              busy
-            }
+            disabled={busy}
             onClick={
               revokeAndRepair
             }
-            style={{
-              padding:
-                "10px 14px",
-
-              borderRadius:
-                "8px",
-
-              border:
-                "1px solid #b42318",
-
-              background:
-                "#b42318",
-
-              color:
-                "#ffffff",
-
-              cursor:
-                busy
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                700,
-            }}
           >
             Revoke All & Re-pair
           </button>
         </div>
       </div>
-
-
-      {/* SUCCESS */}
 
       {notice && (
         <div
@@ -1424,10 +1410,7 @@ export default function DisplayPairingManager({
               "14px",
 
             padding:
-              "10px 12px",
-
-            borderRadius:
-              "8px",
+              "10px",
 
             background:
               "#ecfdf3",
@@ -1435,19 +1418,13 @@ export default function DisplayPairingManager({
             color:
               "#027a48",
 
-            fontSize:
-              "13px",
-
-            fontWeight:
-              600,
+            borderRadius:
+              "8px",
           }}
         >
           {notice}
         </div>
       )}
-
-
-      {/* ERROR */}
 
       {error && (
         <div
@@ -1456,10 +1433,7 @@ export default function DisplayPairingManager({
               "14px",
 
             padding:
-              "10px 12px",
-
-            borderRadius:
-              "8px",
+              "10px",
 
             background:
               "#fef3f2",
@@ -1467,11 +1441,8 @@ export default function DisplayPairingManager({
             color:
               "#b42318",
 
-            fontSize:
-              "13px",
-
-            fontWeight:
-              600,
+            borderRadius:
+              "8px",
           }}
         >
           {error}
