@@ -40,6 +40,7 @@ type Props = {
   location: string;
   showWeather?: boolean;
   showForecast?: boolean;
+  paused?: boolean;
 };
 
 function getDayLabel(
@@ -69,6 +70,7 @@ export default function WeatherPanels({
   location,
   showWeather = true,
   showForecast = true,
+  paused = false,
 }: Props) {
   const [
     weather,
@@ -91,32 +93,136 @@ export default function WeatherPanels({
     useState("");
 
   useEffect(() => {
+    if (paused) {
+      return;
+    }
+
     let cancelled =
       false;
 
-    async function loadWeather() {
-      if (
-        !location ||
-        !location.trim()
-      ) {
-        if (!cancelled) {
-          setError(
-            "Weather location is not configured."
+    let timer:
+      number | undefined;
+
+    const normalDelay =
+      120 *
+      60 *
+      1000;
+
+    const maxFailureDelay =
+      120 *
+      60 *
+      1000;
+
+    let failureDelay =
+      5 *
+      60 *
+      1000;
+
+    const cleanedLocation =
+      location?.trim() ??
+      "";
+
+    if (!cleanedLocation) {
+      setError(
+        "Weather location is not configured."
+      );
+
+      setLoading(
+        false
+      );
+
+      return;
+    }
+
+    const cacheKey =
+      `family-display:weather:${cleanedLocation.toLowerCase()}`;
+
+    /*
+      Weather is public data, so it is
+      safe to keep the last successful
+      result in localStorage.
+
+      Cached weather may be used for up
+      to 12 hours during an outage.
+    */
+
+    function restoreCachedWeather() {
+      try {
+        const raw =
+          localStorage.getItem(
+            cacheKey
           );
 
-          setLoading(
-            false
-          );
+        if (!raw) {
+          return false;
         }
 
+        const cached =
+          JSON.parse(raw);
+
+        const savedAt =
+          Number(
+            cached?.savedAt
+          );
+
+        if (
+          !savedAt ||
+          Date.now() -
+            savedAt >
+            12 *
+              60 *
+              60 *
+              1000
+        ) {
+          return false;
+        }
+
+        if (
+          !cached?.data
+            ?.current ||
+          !Array.isArray(
+            cached?.data
+              ?.daily
+          )
+        ) {
+          return false;
+        }
+
+        setWeather(
+          cached.data as
+            WeatherResponse
+        );
+
+        setLoading(
+          false
+        );
+
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function scheduleNext(
+      delay: number
+    ) {
+      if (cancelled) {
         return;
       }
 
+      timer =
+        window.setTimeout(
+          loadWeather,
+          delay
+        );
+    }
+
+    async function loadWeather() {
       try {
         const response =
           await fetch(
             `/api/weather?location=${encodeURIComponent(
-              location.trim()
+              cleanedLocation
             )}`,
             {
               cache:
@@ -124,19 +230,12 @@ export default function WeatherPanels({
             }
           );
 
-        /*
-          Read the response body even
-          when the status is an error.
-          This lets us see the actual
-          API error instead of only
-          "Weather request failed".
-        */
-
         const data =
           await response
             .json()
             .catch(
-              () => null
+              () =>
+                null
             );
 
         if (
@@ -167,12 +266,37 @@ export default function WeatherPanels({
         }
 
         setWeather(
-          data as WeatherResponse
+          data as
+            WeatherResponse
         );
 
+        try {
+          localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              savedAt:
+                Date.now(),
+
+              data,
+            })
+          );
+        } catch {
+          // Cache failures are harmless.
+        }
+
         setError("");
+
         setLoading(
           false
+        );
+
+        failureDelay =
+          5 *
+          60 *
+          1000;
+
+        scheduleNext(
+          normalDelay
         );
       } catch (
         requestError
@@ -186,15 +310,10 @@ export default function WeatherPanels({
           return;
         }
 
-        /*
-          If we already have weather
-          loaded, keep displaying it
-          instead of blanking the card
-          because of one temporary
-          request failure.
-        */
+        const restored =
+          restoreCachedWeather();
 
-        if (!weather) {
+        if (!restored) {
           setError(
             requestError instanceof
               Error
@@ -206,30 +325,47 @@ export default function WeatherPanels({
         setLoading(
           false
         );
+
+        scheduleNext(
+          failureDelay
+        );
+
+        failureDelay =
+          Math.min(
+            failureDelay *
+              2,
+            maxFailureDelay
+          );
       }
     }
 
-    loadWeather();
-
     /*
-      Refresh every 15 minutes.
+      Show cached weather immediately
+      if available while current weather
+      is being retrieved.
     */
 
-    const timer =
-      window.setInterval(
-        loadWeather,
-        15 * 60 * 1000
-      );
+    restoreCachedWeather();
+
+    loadWeather();
 
     return () => {
       cancelled =
         true;
 
-      window.clearInterval(
-        timer
-      );
+      if (
+        timer !==
+        undefined
+      ) {
+        window.clearTimeout(
+          timer
+        );
+      }
     };
-  }, [location]);
+  }, [
+    location,
+    paused,
+  ]);
 
   if (
     !showWeather &&

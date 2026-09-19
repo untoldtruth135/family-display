@@ -123,7 +123,7 @@ export async function GET(
           .from(BUCKET)
           .createSignedUrl(
             photo.storage_path,
-            60 * 60
+            3 * 60 * 60
           );
 
       if (signedUrlError) {

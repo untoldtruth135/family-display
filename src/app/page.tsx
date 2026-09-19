@@ -1,4 +1,5 @@
 "use client";
+import { createClient } from "@supabase/supabase-js";
 
 import type {
   CSSProperties,
@@ -529,6 +530,19 @@ function getContrastText(
    PAGE
    ========================================================= */
 
+const familyDisplayRealtimeSupabase =
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+
 export default function Home() {
   /*
     ---------------------------------------------------------
@@ -606,6 +620,38 @@ export default function Home() {
     useState(false);
 
   /* =======================================================
+     PAGE VISIBILITY
+     ======================================================= */
+
+  const [
+    pageVisible,
+    setPageVisible,
+  ] =
+    useState(false);
+
+  useEffect(() => {
+    function updateVisibility() {
+      setPageVisible(
+        !document.hidden
+      );
+    }
+
+    updateVisibility();
+
+    document.addEventListener(
+      "visibilitychange",
+      updateVisibility
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        updateVisibility
+      );
+    };
+  }, []);
+
+  /* =======================================================
      CLOCK
      ======================================================= */
 
@@ -640,8 +686,112 @@ export default function Home() {
      ======================================================= */
 
   useEffect(() => {
+    if (!pageVisible) {
+      return;
+    }
+
     let cancelled =
       false;
+
+    let timer:
+      number | undefined;
+
+    const normalDelay =
+      5 *
+      60 *
+      1000;
+
+    const maxFailureDelay =
+      15 *
+      60 *
+      1000;
+
+    let failureDelay =
+      60 *
+      1000;
+
+    const cacheKey =
+      "family-display:display-config";
+
+    function clearPrivateCache() {
+      try {
+        for (
+          let index =
+            sessionStorage.length -
+            1;
+          index >= 0;
+          index--
+        ) {
+          const key =
+            sessionStorage.key(
+              index
+            );
+
+          if (
+            key?.startsWith(
+              "family-display:"
+            )
+          ) {
+            sessionStorage.removeItem(
+              key
+            );
+          }
+        }
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+
+    function restoreCachedConfig() {
+      try {
+        const raw =
+          sessionStorage.getItem(
+            cacheKey
+          );
+
+        if (!raw) {
+          return false;
+        }
+
+        const cached =
+          JSON.parse(raw);
+
+        const cachedData =
+          cached?.data;
+
+        if (
+          !cachedData
+            ?.household ||
+          !cachedData
+            ?.display
+        ) {
+          return false;
+        }
+
+        setDisplayConfig(
+          cachedData as
+            DisplayConfig
+        );
+
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function scheduleNext(
+      delay: number
+    ) {
+      if (cancelled) {
+        return;
+      }
+
+      timer =
+        window.setTimeout(
+          loadConfig,
+          delay
+        );
+    }
 
     async function loadConfig() {
       try {
@@ -662,21 +812,29 @@ export default function Home() {
                 null
             );
 
-if (response.status === 401) {
-  window.location.replace("/pair");
-  return;
-}
+        if (
+          response.status ===
+          401
+        ) {
+          clearPrivateCache();
 
-if (!response.ok) {
-  throw new Error(
-    data?.error ??
-      "Unable to load display configuration."
-  );
-}
+          window.location.replace(
+            "/pair"
+          );
+
+          return;
+        }
 
         if (
-          cancelled
+          !response.ok
         ) {
+          throw new Error(
+            data?.error ??
+              "Unable to load display configuration."
+          );
+        }
+
+        if (cancelled) {
           return;
         }
 
@@ -685,8 +843,31 @@ if (!response.ok) {
             DisplayConfig
         );
 
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              savedAt:
+                Date.now(),
+
+              data,
+            })
+          );
+        } catch {
+          // Cache failure should never
+          // break the dashboard.
+        }
+
         setConfigError(
           false
+        );
+
+        failureDelay =
+          60 *
+          1000;
+
+        scheduleNext(
+          normalDelay
         );
       } catch (
         error
@@ -696,33 +877,55 @@ if (!response.ok) {
           error
         );
 
-        if (
-          !cancelled
-        ) {
-          setConfigError(
-            true
-          );
+        if (cancelled) {
+          return;
         }
+
+        /*
+          Only restore cached private
+          data AFTER a real network/server
+          failure.
+
+          A 401 never uses cached data.
+        */
+
+        restoreCachedConfig();
+
+        setConfigError(
+          true
+        );
+
+        scheduleNext(
+          failureDelay
+        );
+
+        failureDelay =
+          Math.min(
+            failureDelay *
+              2,
+            maxFailureDelay
+          );
       }
     }
 
     loadConfig();
 
-    const timer =
-      window.setInterval(
-        loadConfig,
-        15_000
-      );
-
     return () => {
       cancelled =
         true;
 
-      window.clearInterval(
-        timer
-      );
+      if (
+        timer !==
+        undefined
+      ) {
+        window.clearTimeout(
+          timer
+        );
+      }
     };
-  }, []);
+  }, [
+    pageVisible,
+  ]);
 
   /* =======================================================
      DISPLAY DEFAULTS
@@ -835,12 +1038,32 @@ if (!response.ok) {
     timezoneParts.month;
 
   /* =======================================================
+     SCHEDULE
+     ======================================================= */
+
+  const currentMinutes =
+    timezoneParts.hour *
+      60 +
+    timezoneParts.minute;
+
+  const scheduleMode =
+    getScheduleMode(
+      schedules,
+      timezoneParts.weekday,
+      currentMinutes
+    );
+
+  /* =======================================================
      GOOGLE CALENDAR EVENTS
+     Supabase Realtime + 60-minute fallback
      ======================================================= */
 
   useEffect(() => {
     if (
       !mounted ||
+      !pageVisible ||
+      scheduleMode ===
+        "sleep" ||
       !displayConfig ||
       !showCalendar ||
       currentYear <
@@ -852,7 +1075,148 @@ if (!response.ok) {
     let cancelled =
       false;
 
+    let fallbackTimer:
+      number | undefined;
+
+    let requestInFlight =
+      false;
+
+    /*
+      Realtime is now the primary refresh mechanism.
+
+      This one-hour timer is only a safety net in case
+      a browser temporarily loses its Realtime connection.
+    */
+
+    const normalFallbackDelay =
+      60 *
+      60 *
+      1000;
+
+    const maxFailureDelay =
+      15 *
+      60 *
+      1000;
+
+    let failureDelay =
+      60 *
+      1000;
+
+    const householdId =
+      displayConfig.household.id;
+
+    const cacheKey =
+      `family-display:calendar:${householdId}:${currentYear}-${currentMonth}`;
+
+    const realtimeTopic =
+      `calendar:${householdId}`;
+
+    function clearPrivateCache() {
+      try {
+        for (
+          let index =
+            sessionStorage.length -
+            1;
+          index >= 0;
+          index--
+        ) {
+          const key =
+            sessionStorage.key(
+              index
+            );
+
+          if (
+            key?.startsWith(
+              "family-display:"
+            )
+          ) {
+            sessionStorage.removeItem(
+              key
+            );
+          }
+        }
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+
+    function restoreCachedCalendar() {
+      try {
+        const raw =
+          sessionStorage.getItem(
+            cacheKey
+          );
+
+        if (!raw) {
+          return false;
+        }
+
+        const cached =
+          JSON.parse(raw);
+
+        if (
+          !Array.isArray(
+            cached?.events
+          ) ||
+          !Array.isArray(
+            cached?.calendars
+          )
+        ) {
+          return false;
+        }
+
+        setCalendarEvents(
+          cached.events
+        );
+
+        setCalendarSources(
+          cached.calendars
+        );
+
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function scheduleFallback(
+      delay: number
+    ) {
+      if (
+        cancelled
+      ) {
+        return;
+      }
+
+      if (
+        fallbackTimer !==
+        undefined
+      ) {
+        window.clearTimeout(
+          fallbackTimer
+        );
+      }
+
+      fallbackTimer =
+        window.setTimeout(
+          () => {
+            void loadCalendarEvents();
+          },
+          delay
+        );
+    }
+
     async function loadCalendarEvents() {
+      if (
+        cancelled ||
+        requestInFlight
+      ) {
+        return;
+      }
+
+      requestInFlight =
+        true;
+
       try {
         setCalendarLoading(
           true
@@ -876,6 +1240,19 @@ if (!response.ok) {
             );
 
         if (
+          response.status ===
+          401
+        ) {
+          clearPrivateCache();
+
+          window.location.replace(
+            "/pair"
+          );
+
+          return;
+        }
+
+        if (
           !response.ok
         ) {
           throw new Error(
@@ -890,24 +1267,63 @@ if (!response.ok) {
           return;
         }
 
-        setCalendarEvents(
+        const nextEvents =
           Array.isArray(
             data?.events
           )
             ? data.events
-            : []
-        );
+            : [];
 
-        setCalendarSources(
+        const nextCalendars =
           Array.isArray(
             data?.calendars
           )
             ? data.calendars
-            : []
+            : [];
+
+        setCalendarEvents(
+          nextEvents
         );
+
+        setCalendarSources(
+          nextCalendars
+        );
+
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              savedAt:
+                Date.now(),
+
+              events:
+                nextEvents,
+
+              calendars:
+                nextCalendars,
+            })
+          );
+        } catch {
+          // Ignore cache failures.
+        }
 
         setCalendarError(
           false
+        );
+
+        failureDelay =
+          60 *
+          1000;
+
+        /*
+          No 1-minute polling anymore.
+
+          Realtime will normally cause the next refresh.
+          This timer is only the one-hour fallback.
+        */
+
+        scheduleFallback(
+          normalFallbackDelay
         );
       } catch (
         error
@@ -918,13 +1334,42 @@ if (!response.ok) {
         );
 
         if (
-          !cancelled
+          cancelled
         ) {
-          setCalendarError(
-            true
-          );
+          return;
         }
+
+        /*
+          Continue showing the most recent successful
+          calendar information.
+        */
+
+        restoreCachedCalendar();
+
+        setCalendarError(
+          true
+        );
+
+        /*
+          Failed requests retry sooner.
+
+          1, 2, 4, 8, then 15 minutes maximum.
+        */
+
+        scheduleFallback(
+          failureDelay
+        );
+
+        failureDelay =
+          Math.min(
+            failureDelay *
+              2,
+            maxFailureDelay
+          );
       } finally {
+        requestInFlight =
+          false;
+
         if (
           !cancelled
         ) {
@@ -935,52 +1380,127 @@ if (!response.ok) {
       }
     }
 
-    loadCalendarEvents();
-
     /*
-      Reload Google events every
-      five minutes.
+      Listen only for this household's
+      calendar change notifications.
+
+      The broadcast contains no private
+      calendar event data.
     */
 
-    const timer =
-      window.setInterval(
-        loadCalendarEvents,
-        5 *
-          60 *
-          1000
-      );
+    const realtimeChannel =
+      familyDisplayRealtimeSupabase
+        .channel(
+          realtimeTopic
+        )
+        .on(
+          "broadcast",
+          {
+            event:
+              "calendar_changed",
+          },
+          (
+            message
+          ) => {
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            const changedYear =
+              Number(
+                message
+                  ?.payload
+                  ?.year
+              );
+
+            const changedMonth =
+              Number(
+                message
+                  ?.payload
+                  ?.month
+              );
+
+            /*
+              Ignore notifications for months
+              this display is not currently showing.
+            */
+
+            if (
+              Number.isFinite(
+                changedYear
+              ) &&
+              Number.isFinite(
+                changedMonth
+              ) &&
+              (
+                changedYear !==
+                  currentYear ||
+                changedMonth !==
+                  currentMonth
+              )
+            ) {
+              return;
+            }
+
+            void loadCalendarEvents();
+          }
+        )
+        .subscribe(
+          (
+            status
+          ) => {
+            if (
+              status ===
+              "CHANNEL_ERROR"
+            ) {
+              console.error(
+                "Calendar Realtime channel error."
+              );
+            }
+          }
+        );
+
+    /*
+      Immediately show cached data,
+      then perform one secure server read.
+
+      After this, Realtime becomes
+      the primary refresh mechanism.
+    */
+
+    restoreCachedCalendar();
+
+    void loadCalendarEvents();
 
     return () => {
       cancelled =
         true;
 
-      window.clearInterval(
-        timer
-      );
+      if (
+        fallbackTimer !==
+        undefined
+      ) {
+        window.clearTimeout(
+          fallbackTimer
+        );
+      }
+
+      void familyDisplayRealtimeSupabase
+        .removeChannel(
+          realtimeChannel
+        );
     };
   }, [
     mounted,
+    pageVisible,
+    scheduleMode,
     displayConfig?.household.id,
     showCalendar,
     currentYear,
     currentMonth,
   ]);
-
-  /* =======================================================
-     SCHEDULE
-     ======================================================= */
-
-  const currentMinutes =
-    timezoneParts.hour *
-      60 +
-    timezoneParts.minute;
-
-  const scheduleMode =
-    getScheduleMode(
-      schedules,
-      timezoneParts.weekday,
-      currentMinutes
-    );
 
   /* =======================================================
      CLOCK FORMAT
@@ -1075,13 +1595,27 @@ if (!response.ok) {
           0
         );
 
+      type MonthCell = {
+        day: number;
+        month: number;
+        year: number;
+        dateKey: string;
+        inCurrentMonth: boolean;
+        monthLabel: string;
+      };
+
       const cells:
         Array<
-          number | null
+          MonthCell | null
         > = [];
 
+      /*
+        Keep the leading cells blank.
+      */
+
       for (
-        let index = 0;
+        let index =
+          0;
         index <
         firstDay.getDay();
         index++
@@ -1091,25 +1625,119 @@ if (!response.ok) {
         );
       }
 
+      /*
+        Current month.
+      */
+
       for (
-        let day = 1;
+        let day =
+          1;
         day <=
         lastDay.getDate();
         day++
       ) {
-        cells.push(
-          day
-        );
+        cells.push({
+          day,
+
+          month:
+            monthIndex +
+            1,
+
+          year,
+
+          dateKey:
+            `${year}-${pad(
+              monthIndex +
+                1
+            )}-${pad(
+              day
+            )}`,
+
+          inCurrentMonth:
+            true,
+
+          monthLabel:
+            "",
+        });
       }
+
+      /*
+        Instead of blank cells at the end,
+        fill the rest of the week with dates
+        from the following month.
+      */
+
+      const nextMonthIndex =
+        (
+          monthIndex +
+          1
+        ) %
+        12;
+
+      const nextMonthYear =
+        monthIndex ===
+        11
+          ? year +
+            1
+          : year;
+
+      const nextMonthNumber =
+        nextMonthIndex +
+        1;
+
+      const nextMonthLabel =
+        new Intl.DateTimeFormat(
+          "en-US",
+          {
+            month:
+              "short",
+
+            timeZone:
+              "UTC",
+          }
+        ).format(
+          new Date(
+            Date.UTC(
+              nextMonthYear,
+              nextMonthIndex,
+              1
+            )
+          )
+        );
+
+      let nextMonthDay =
+        1;
 
       while (
         cells.length %
           7 !==
         0
       ) {
-        cells.push(
-          null
-        );
+        cells.push({
+          day:
+            nextMonthDay,
+
+          month:
+            nextMonthNumber,
+
+          year:
+            nextMonthYear,
+
+          dateKey:
+            `${nextMonthYear}-${pad(
+              nextMonthNumber
+            )}-${pad(
+              nextMonthDay
+            )}`,
+
+          inCurrentMonth:
+            false,
+
+          monthLabel:
+            nextMonthLabel,
+        });
+
+        nextMonthDay++;
       }
 
       const monthName =
@@ -1297,6 +1925,11 @@ if (!response.ok) {
             .backgroundOverlayOpacity ??
           0.72
         }
+        paused={
+          !pageVisible ||
+          scheduleMode ===
+            "sleep"
+        }
       />
 
       {/* ===================================================
@@ -1358,6 +1991,11 @@ if (!response.ok) {
             }
             showForecast={
               showForecast
+            }
+            paused={
+              !pageVisible ||
+              scheduleMode ===
+                "sleep"
             }
           />
 
@@ -1462,26 +2100,25 @@ if (!response.ok) {
               .cells
               .map(
                 (
-                  day,
+                  cell,
                   index
                 ) => {
+                  const day =
+                    cell?.day ??
+                    null;
+
                   /*
-                    Build the same YYYY-MM-DD
-                    key returned by the
-                    Google event API.
+                    Each populated cell now carries
+                    its complete YYYY-MM-DD date.
                   */
 
                   const dateKey =
-                    day
-                      ? `${monthData.year}-${pad(
-                          monthData.month
-                        )}-${pad(
-                          day
-                        )}`
-                      : "";
+                    cell
+                      ?.dateKey ??
+                    "";
 
                   const events =
-                    day
+                    cell
                       ? calendarEvents.filter(
                           (
                             event
@@ -1492,27 +2129,40 @@ if (!response.ok) {
                       : [];
 
                   const isToday =
-                    day ===
-                      timezoneParts.day &&
-                    monthData.month ===
-                      timezoneParts.month &&
-                    monthData.year ===
-                      timezoneParts.year;
+                    Boolean(
+                      cell &&
+                      cell.day ===
+                        timezoneParts.day &&
+                      cell.month ===
+                        timezoneParts.month &&
+                      cell.year ===
+                        timezoneParts.year
+                    );
+
+                  const isNextMonth =
+                    Boolean(
+                      cell &&
+                      !cell.inCurrentMonth
+                    );
 
                   return (
                     <div
-                      key={`${
-                        day ??
-                        "blank"
-                      }-${index}`}
+                      key={
+                        cell
+                          ?.dateKey ??
+                        `blank-${index}`
+                      }
                       className={`calendarCell ${
                         isToday
                           ? "todayCell"
                           : ""
+                      } ${
+                        isNextMonth
+                          ? "nextMonthCell"
+                          : ""
                       }`}
                     >
-                      {day !==
-                        null && (
+                      {cell && (
                         <>
                           {/* DATE NUMBER */}
 
@@ -1521,11 +2171,15 @@ if (!response.ok) {
                               isToday
                                 ? "todayNumber"
                                 : ""
+                            } ${
+                              isNextMonth
+                                ? "nextMonthNumber"
+                                : ""
                             }`}
                           >
-                            {
-                              day
-                            }
+                            {isNextMonth
+                              ? `${cell.monthLabel} ${cell.day}`
+                              : cell.day}
                           </div>
 
                           {/* =================================

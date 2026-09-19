@@ -26,6 +26,8 @@ type Props = {
     | "contain";
 
   overlayOpacity: number;
+
+  paused?: boolean;
 };
 
 function shufflePhotos(
@@ -64,6 +66,7 @@ export default function RotatingBackground({
   shuffle,
   fit,
   overlayOpacity,
+  paused = false,
 }: Props) {
   const [
     photos,
@@ -83,6 +86,116 @@ export default function RotatingBackground({
       return;
     }
 
+    if (paused) {
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    let timer:
+      number | undefined;
+
+    const normalDelay =
+      60 *
+      60 *
+      1000;
+
+    const maxFailureDelay =
+      60 *
+      60 *
+      1000;
+
+    let failureDelay =
+      5 *
+      60 *
+      1000;
+
+    const cacheKey =
+      "family-display:backgrounds";
+
+    /*
+      Background URLs are signed for
+      three hours.
+
+      We will only restore a cached
+      manifest if it is less than two
+      hours old.
+    */
+
+    function restoreCachedPhotos() {
+      try {
+        const raw =
+          sessionStorage.getItem(
+            cacheKey
+          );
+
+        if (!raw) {
+          return false;
+        }
+
+        const cached =
+          JSON.parse(raw);
+
+        const savedAt =
+          Number(
+            cached?.savedAt
+          );
+
+        if (
+          !savedAt ||
+          Date.now() -
+            savedAt >
+            2 *
+              60 *
+              60 *
+              1000
+        ) {
+          return false;
+        }
+
+        if (
+          !Array.isArray(
+            cached?.photos
+          )
+        ) {
+          return false;
+        }
+
+        const restored =
+          cached.photos as
+            Photo[];
+
+        setPhotos(
+          shuffle
+            ? shufflePhotos(
+                restored
+              )
+            : restored
+        );
+
+        setIndex(0);
+
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function scheduleNext(
+      delay: number
+    ) {
+      if (cancelled) {
+        return;
+      }
+
+      timer =
+        window.setTimeout(
+          loadPhotos,
+          delay
+        );
+    }
+
     async function loadPhotos() {
       try {
         const response =
@@ -93,6 +206,25 @@ export default function RotatingBackground({
                 "no-store",
             }
           );
+
+        if (
+          response.status ===
+          401
+        ) {
+          try {
+            sessionStorage.removeItem(
+              cacheKey
+            );
+          } catch {
+            // Ignore storage failures.
+          }
+
+          window.location.replace(
+            "/pair"
+          );
+
+          return;
+        }
 
         if (
           !response.ok
@@ -109,6 +241,10 @@ export default function RotatingBackground({
           (data.photos ??
             []) as Photo[];
 
+        if (cancelled) {
+          return;
+        }
+
         setPhotos(
           shuffle
             ? shufflePhotos(
@@ -118,6 +254,31 @@ export default function RotatingBackground({
         );
 
         setIndex(0);
+
+        try {
+          sessionStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              savedAt:
+                Date.now(),
+
+              photos:
+                loaded,
+            })
+          );
+        } catch {
+          // Cache failure should not
+          // affect the display.
+        }
+
+        failureDelay =
+          5 *
+          60 *
+          1000;
+
+        scheduleNext(
+          normalDelay
+        );
       } catch (
         error
       ) {
@@ -125,36 +286,58 @@ export default function RotatingBackground({
           "Background loading error:",
           error
         );
+
+        if (cancelled) {
+          return;
+        }
+
+        restoreCachedPhotos();
+
+        scheduleNext(
+          failureDelay
+        );
+
+        failureDelay =
+          Math.min(
+            failureDelay *
+              2,
+            maxFailureDelay
+          );
       }
     }
 
+    /*
+      If a recently signed manifest is
+      available, show it immediately.
+    */
+
+    restoreCachedPhotos();
+
     loadPhotos();
 
-    /*
-      Signed photo URLs last
-      one hour. Refresh them
-      every 45 minutes.
-    */
-    const refreshTimer =
-      setInterval(
-        loadPhotos,
-        45 *
-          60 *
-          1000
-      );
+    return () => {
+      cancelled =
+        true;
 
-    return () =>
-      clearInterval(
-        refreshTimer
-      );
+      if (
+        timer !==
+        undefined
+      ) {
+        window.clearTimeout(
+          timer
+        );
+      }
+    };
   }, [
     enabled,
     shuffle,
+    paused,
   ]);
 
   useEffect(() => {
     if (
       !enabled ||
+      paused ||
       photos.length <= 1
     ) {
       return;
@@ -188,6 +371,7 @@ export default function RotatingBackground({
       );
   }, [
     enabled,
+    paused,
     photos,
     intervalSeconds,
   ]);
