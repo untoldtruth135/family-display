@@ -14,6 +14,7 @@ import {
 import WeatherPanels from "@/components/WeatherPanels";
 import RotatingBackground from "@/components/RotatingBackground";
 import AutoScrollEvents from "@/components/AutoScrollEvents";
+import AutoScrollText from "@/components/AutoScrollText";
 
 /* =========================================================
    TYPES
@@ -64,6 +65,19 @@ type CalendarSource = {
   color: string;
 };
 
+type ScheduledMessage = {
+  id: string;
+  message: string;
+  startsAt: string;
+
+  endsAt:
+    | string
+    | null;
+
+  priority: number;
+};
+
+
 type DisplayConfig = {
   household: {
     id: string;
@@ -81,6 +95,9 @@ type DisplayConfig = {
     messageExpiresAt:
       | string
       | null;
+
+    scheduledMessages?:
+      ScheduledMessage[];
 
     orientation:
       | "landscape"
@@ -1573,207 +1590,248 @@ export default function Home() {
 
   const monthData =
     useMemo(() => {
-      const year =
-        timezoneParts.year;
-
-      const monthIndex =
-        timezoneParts.month -
-        1;
-
-      const firstDay =
-        new Date(
-          year,
-          monthIndex,
-          1
-        );
-
-      const lastDay =
-        new Date(
-          year,
-          monthIndex +
-            1,
-          0
-        );
-
-      type MonthCell = {
+      type CalendarCell = {
         day: number;
         month: number;
         year: number;
         dateKey: string;
-        inCurrentMonth: boolean;
         monthLabel: string;
+        isMonthStart: boolean;
+        isCurrentWeek: boolean;
+        inCurrentMonth: boolean;
       };
 
-      const cells:
-        Array<
-          MonthCell | null
-        > = [];
+
+      const todayUtc =
+        new Date(
+          Date.UTC(
+            timezoneParts.year,
+            timezoneParts.month -
+              1,
+            timezoneParts.day
+          )
+        );
+
 
       /*
-        Keep the leading cells blank.
+        Sunday at the beginning of the
+        current calendar week.
       */
+
+      const currentWeekStart =
+        new Date(
+          todayUtc
+        );
+
+      currentWeekStart.setUTCDate(
+        currentWeekStart.getUTCDate() -
+          currentWeekStart.getUTCDay()
+      );
+
+
+      /*
+        The first row is always the
+        previous week.
+      */
+
+      const gridStart =
+        new Date(
+          currentWeekStart
+        );
+
+      gridStart.setUTCDate(
+        gridStart.getUTCDate() -
+          7
+      );
+
+
+      const cells:
+        CalendarCell[] =
+        [];
+
 
       for (
         let index =
           0;
         index <
-        firstDay.getDay();
+          28;
         index++
       ) {
-        cells.push(
-          null
-        );
-      }
-
-      /*
-        Current month.
-      */
-
-      for (
-        let day =
-          1;
-        day <=
-        lastDay.getDate();
-        day++
-      ) {
-        cells.push({
-          day,
-
-          month:
-            monthIndex +
-            1,
-
-          year,
-
-          dateKey:
-            `${year}-${pad(
-              monthIndex +
-                1
-            )}-${pad(
-              day
-            )}`,
-
-          inCurrentMonth:
-            true,
-
-          monthLabel:
-            "",
-        });
-      }
-
-      /*
-        Instead of blank cells at the end,
-        fill the rest of the week with dates
-        from the following month.
-      */
-
-      const nextMonthIndex =
-        (
-          monthIndex +
-          1
-        ) %
-        12;
-
-      const nextMonthYear =
-        monthIndex ===
-        11
-          ? year +
-            1
-          : year;
-
-      const nextMonthNumber =
-        nextMonthIndex +
-        1;
-
-      const nextMonthLabel =
-        new Intl.DateTimeFormat(
-          "en-US",
-          {
-            month:
-              "short",
-
-            timeZone:
-              "UTC",
-          }
-        ).format(
+        const date =
           new Date(
-            Date.UTC(
-              nextMonthYear,
-              nextMonthIndex,
-              1
-            )
-          )
+            gridStart
+          );
+
+        date.setUTCDate(
+          gridStart.getUTCDate() +
+            index
         );
 
-      let nextMonthDay =
-        1;
 
-      while (
-        cells.length %
-          7 !==
-        0
-      ) {
+        const cellYear =
+          date.getUTCFullYear();
+
+        const cellMonth =
+          date.getUTCMonth() +
+          1;
+
+        const cellDay =
+          date.getUTCDate();
+
+
+        const monthLabel =
+          new Intl.DateTimeFormat(
+            "en-US",
+            {
+              month:
+                "short",
+
+              timeZone:
+                "UTC",
+            }
+          ).format(
+            date
+          );
+
+
         cells.push({
           day:
-            nextMonthDay,
+            cellDay,
 
           month:
-            nextMonthNumber,
+            cellMonth,
 
           year:
-            nextMonthYear,
+            cellYear,
 
           dateKey:
-            `${nextMonthYear}-${pad(
-              nextMonthNumber
+            `${cellYear}-${pad(
+              cellMonth
             )}-${pad(
-              nextMonthDay
+              cellDay
             )}`,
 
+          monthLabel,
+
+          isMonthStart:
+            cellDay ===
+            1,
+
+          /*
+            Index 7-13 is always row 2,
+            which is the current week.
+          */
+
+          isCurrentWeek:
+            index >=
+              7 &&
+            index <
+              14,
+
           inCurrentMonth:
-            false,
-
-          monthLabel:
-            nextMonthLabel,
+            cellMonth ===
+              timezoneParts.month &&
+            cellYear ===
+              timezoneParts.year,
         });
-
-        nextMonthDay++;
       }
 
-      const monthName =
-        new Intl.DateTimeFormat(
-          "en-US",
-          {
-            month:
-              "long",
-          }
-        ).format(
-          new Date(
-            year,
-            monthIndex,
+
+      const first =
+        cells[0];
+
+      const last =
+        cells[
+          cells.length -
             1
+        ];
+
+
+      const longMonth =
+        (
+          year: number,
+          month: number
+        ) =>
+          new Intl.DateTimeFormat(
+            "en-US",
+            {
+              month:
+                "long",
+
+              timeZone:
+                "UTC",
+            }
           )
-        );
+            .format(
+              new Date(
+                Date.UTC(
+                  year,
+                  month -
+                    1,
+                  1
+                )
+              )
+            )
+            .toUpperCase();
+
+
+      let headerLabel =
+        "";
+
+
+      if (
+        first.year ===
+          last.year &&
+        first.month ===
+          last.month
+      ) {
+        headerLabel =
+          `${longMonth(
+            first.year,
+            first.month
+          )} ${first.year}`;
+      } else if (
+        first.year ===
+        last.year
+      ) {
+        headerLabel =
+          `${longMonth(
+            first.year,
+            first.month
+          )} — ${longMonth(
+            last.year,
+            last.month
+          )} ${first.year}`;
+      } else {
+        headerLabel =
+          `${longMonth(
+            first.year,
+            first.month
+          )} ${first.year} — ${longMonth(
+            last.year,
+            last.month
+          )} ${last.year}`;
+      }
+
 
       return {
-        monthName,
-
-        year,
-
-        month:
-          monthIndex +
-          1,
+        headerLabel,
 
         cells,
       };
     }, [
       timezoneParts.year,
       timezoneParts.month,
+      timezoneParts.day,
     ]);
 
   /* =======================================================
      MESSAGE
      ======================================================= */
+
+  /*
+    Start with the existing normal family message.
+  */
 
   let message =
     displayConfig
@@ -1781,10 +1839,12 @@ export default function Home() {
       .message ??
     "God will steer, but you must row.";
 
+
   const messageExpiration =
     displayConfig
       ?.display
       .messageExpiresAt;
+
 
   if (
     messageExpiration &&
@@ -1797,16 +1857,123 @@ export default function Home() {
       "";
   }
 
+
+  /*
+    Scheduled messages temporarily override
+    the normal family message.
+
+    Highest priority wins.
+
+    For equal priority, the message that
+    started most recently wins.
+  */
+
+  const activeScheduledMessage =
+    (
+      displayConfig
+        ?.display
+        .scheduledMessages ??
+      []
+    )
+      .filter(
+        (
+          scheduled
+        ) => {
+          const starts =
+            new Date(
+              scheduled.startsAt
+            ).getTime();
+
+          const ends =
+            scheduled.endsAt
+              ? new Date(
+                  scheduled.endsAt
+                ).getTime()
+              : null;
+
+
+          return (
+            starts <=
+              now.getTime() &&
+            (
+              ends ===
+                null ||
+              ends >
+                now.getTime()
+            )
+          );
+        }
+      )
+      .sort(
+        (
+          first,
+          second
+        ) => {
+          if (
+            first.priority !==
+            second.priority
+          ) {
+            return (
+              second.priority -
+              first.priority
+            );
+          }
+
+
+          return (
+            new Date(
+              second.startsAt
+            ).getTime() -
+            new Date(
+              first.startsAt
+            ).getTime()
+          );
+        }
+      )[0];
+
+
+  if (
+    activeScheduledMessage
+  ) {
+    message =
+      activeScheduledMessage
+        .message;
+  }
+
   /* =======================================================
      SIDEBAR
      ======================================================= */
+
+  /*
+    Keep the left-column proportions balanced.
+
+    The clock is intentionally about 25% shorter
+    than before, with that space transferred to
+    the Today / Family Message card.
+  */
+
+  const sidebarTodayDateKey =
+    `${timezoneParts.year}-${pad(
+      timezoneParts.month
+    )}-${pad(
+      timezoneParts.day
+    )}`;
+
+  const sidebarHasTodayAgenda =
+    calendarEvents.some(
+      (
+        event
+      ) =>
+        event.date ===
+        sidebarTodayDateKey
+    );
 
   const sidebarRows:
     string[] = [];
 
   if (showClock) {
     sidebarRows.push(
-      "1.35fr"
+      "1fr"
     );
   }
 
@@ -1822,9 +1989,12 @@ export default function Home() {
     );
   }
 
-  if (showMessage) {
+  if (
+    showMessage ||
+    sidebarHasTodayAgenda
+  ) {
     sidebarRows.push(
-      "2.7fr"
+      "3.05fr"
     );
   }
 
@@ -1863,6 +2033,59 @@ export default function Home() {
   /* =======================================================
      RENDER
      ======================================================= */
+
+  /* =======================================================
+     TODAY AGENDA
+     ======================================================= */
+
+  const todayDateKey =
+    `${timezoneParts.year}-${pad(
+      timezoneParts.month
+    )}-${pad(
+      timezoneParts.day
+    )}`;
+
+
+  const todayAgendaEvents =
+    calendarEvents
+      .filter(
+        (
+          event
+        ) =>
+          event.date ===
+          todayDateKey
+      )
+      .sort(
+        (
+          first,
+          second
+        ) => {
+          if (
+            first.allDay !==
+            second.allDay
+          ) {
+            return first.allDay
+              ? -1
+              : 1;
+          }
+
+          return (
+            first.start ??
+            ""
+          ).localeCompare(
+            second.start ??
+            ""
+          );
+        }
+      );
+
+
+  const visibleTodayAgendaEvents =
+    todayAgendaEvents.slice(
+      0,
+      4
+    );
+
 
   return (
     <main
@@ -1999,16 +2222,90 @@ export default function Home() {
             }
           />
 
-          {/* MESSAGE */}
+          {/* TODAY AGENDA + MESSAGE */}
 
-          {showMessage && (
-            <section className="card messageCard">
-              <div className="messageText">
-                {
-                  message ||
-                  " "
-                }
-              </div>
+          {(
+            showMessage ||
+            todayAgendaEvents.length >
+              0
+          ) && (
+            <section
+              className={`card messageCard ${
+                todayAgendaEvents.length >
+                  0
+                  ? "messageCardWithAgenda"
+                  : ""
+              }`}
+            >
+              {todayAgendaEvents.length >
+                0 && (
+                <div className="todayAgenda">
+                  <div className="todayAgendaHeader">
+                    TODAY
+                  </div>
+
+                  <div className="todayAgendaList">
+                    {visibleTodayAgendaEvents.map(
+                      (
+                        event
+                      ) => (
+                        <div
+                          className="todayAgendaItem"
+                          key={
+                            `agenda-${event.id}`
+                          }
+                        >
+                          <span className="todayAgendaTime">
+                            {event.allDay
+                              ? "ALL DAY"
+                              : event.start
+                                ? formatEventTime(
+                                    event.start,
+                                    timezone,
+                                    use24HourClock
+                                  )
+                                : ""}
+                          </span>
+
+                          <AutoScrollText className="todayAgendaTitle">
+                            {
+                              event.title
+                            }
+                          </AutoScrollText>
+                        </div>
+                      )
+                    )}
+
+                    {todayAgendaEvents.length >
+                      visibleTodayAgendaEvents.length && (
+                      <div className="todayAgendaMore">
+                        +
+                        {
+                          todayAgendaEvents.length -
+                          visibleTodayAgendaEvents.length
+                        }{" "}
+                        more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {showMessage && (
+                <>
+                  {todayAgendaEvents.length >
+                    0 && (
+                    <div className="todayAgendaDivider" />
+                  )}
+
+                  <div className="messageText">
+                    {
+                      message ||
+                      " "
+                    }
+                  </div>
+                </>
+              )}
 
               <div className="mountainArt">
                 <div className="mountain mountainBack" />
@@ -2034,10 +2331,7 @@ export default function Home() {
             <div>
               <div className="calendarTitle">
                 {
-                  monthData.monthName
-                }{" "}
-                {
-                  monthData.year
+                  monthData.headerLabel
                 }
               </div>
 
@@ -2139,10 +2433,16 @@ export default function Home() {
                         timezoneParts.year
                     );
 
-                  const isNextMonth =
+                  const isOtherMonth =
                     Boolean(
                       cell &&
                       !cell.inCurrentMonth
+                    );
+
+                  const isCurrentWeek =
+                    Boolean(
+                      cell
+                        ?.isCurrentWeek
                     );
 
                   return (
@@ -2157,8 +2457,12 @@ export default function Home() {
                           ? "todayCell"
                           : ""
                       } ${
-                        isNextMonth
-                          ? "nextMonthCell"
+                        isOtherMonth
+                          ? "otherMonthCell"
+                          : ""
+                      } ${
+                        isCurrentWeek
+                          ? "currentWeekCell"
                           : ""
                       }`}
                     >
@@ -2172,12 +2476,12 @@ export default function Home() {
                                 ? "todayNumber"
                                 : ""
                             } ${
-                              isNextMonth
-                                ? "nextMonthNumber"
+                              isOtherMonth
+                                ? "otherMonthNumber"
                                 : ""
                             }`}
                           >
-                            {isNextMonth
+                            {cell.isMonthStart
                               ? `${cell.monthLabel} ${cell.day}`
                               : cell.day}
                           </div>
@@ -2225,9 +2529,11 @@ export default function Home() {
                                       }}
                                       title={`${event.calendarName}: ${event.title}`}
                                     >
-                                      {
-                                        event.title
-                                      }
+                                      <AutoScrollText>
+                                        {
+                                          event.title
+                                        }
+                                      </AutoScrollText>
                                     </div>
                                   );
                                 }
@@ -2256,20 +2562,22 @@ export default function Home() {
                                       }}
                                     />
 
-                                    <div>
+                                    <div className="eventDotContent">
                                       {event.start && (
                                         <span className="eventTime">
                                           {formatEventTime(
                                             event.start,
                                             timezone,
                                             use24HourClock
-                                          )}{" "}
+                                          )}
                                         </span>
                                       )}
 
-                                      {
-                                        event.title
-                                      }
+                                      <AutoScrollText>
+                                        {
+                                          event.title
+                                        }
+                                      </AutoScrollText>
                                     </div>
                                   </div>
                                 );

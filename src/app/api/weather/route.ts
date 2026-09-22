@@ -403,7 +403,15 @@ export async function GET(
       "current",
       [
         "temperature_2m",
+        "apparent_temperature",
         "weather_code",
+      ].join(",")
+    );
+
+    forecastUrl.searchParams.set(
+      "hourly",
+      [
+        "precipitation_probability",
       ].join(",")
     );
 
@@ -466,6 +474,67 @@ export async function GET(
         currentCode
       );
 
+    /*
+      Match the hourly precipitation probability
+      to the current local forecast hour.
+    */
+
+    const currentTime =
+      String(
+        forecastData
+          ?.current
+          ?.time ??
+          ""
+      );
+
+    const currentHourKey =
+      currentTime.slice(
+        0,
+        13
+      );
+
+    const hourlyTimes:
+      string[] =
+      forecastData
+        ?.hourly
+        ?.time ??
+      [];
+
+    const hourlyPrecipitation:
+      number[] =
+      forecastData
+        ?.hourly
+        ?.precipitation_probability ??
+      [];
+
+    const currentHourIndex =
+      hourlyTimes.findIndex(
+        (
+          time
+        ) =>
+          String(
+            time
+          ).slice(
+            0,
+            13
+          ) ===
+          currentHourKey
+      );
+
+    const precipitationProbability =
+      currentHourIndex >=
+        0
+        ? Math.round(
+            Number(
+              hourlyPrecipitation[
+                currentHourIndex
+              ] ??
+                0
+            )
+          )
+        : 0;
+
+
     const current = {
       temperature:
         Math.round(
@@ -476,6 +545,21 @@ export async function GET(
               0
           )
         ),
+
+      feelsLike:
+        Math.round(
+          Number(
+            forecastData
+              ?.current
+              ?.apparent_temperature ??
+              forecastData
+                ?.current
+                ?.temperature_2m ??
+              0
+          )
+        ),
+
+      precipitationProbability,
 
       weatherCode:
         currentCode,

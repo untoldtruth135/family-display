@@ -10,24 +10,26 @@ import {
 
 type Props = {
   children: ReactNode;
+  className?: string;
 };
 
 type ScrollStyle =
   CSSProperties & {
-    "--day-scroll-distance"?: string;
-    "--day-scroll-duration"?: string;
+    "--event-scroll-distance"?: string;
+    "--event-scroll-duration"?: string;
   };
 
-export default function AutoScrollEvents({
+export default function AutoScrollText({
   children,
+  className = "",
 }: Props) {
   const viewportRef =
-    useRef<HTMLDivElement>(
+    useRef<HTMLSpanElement>(
       null
     );
 
-  const trackRef =
-    useRef<HTMLDivElement>(
+  const contentRef =
+    useRef<HTMLSpanElement>(
       null
     );
 
@@ -41,18 +43,18 @@ export default function AutoScrollEvents({
     duration,
     setDuration,
   ] =
-    useState(14);
+    useState(12);
 
   useEffect(() => {
     const viewport =
       viewportRef.current;
 
-    const track =
-      trackRef.current;
+    const content =
+      contentRef.current;
 
     if (
       !viewport ||
-      !track
+      !content
     ) {
       return;
     }
@@ -76,8 +78,8 @@ export default function AutoScrollEvents({
             const overflow =
               Math.max(
                 0,
-                track.scrollHeight -
-                  viewport.clientHeight
+                content.scrollWidth -
+                  viewport.clientWidth
               );
 
             const nextDistance =
@@ -91,17 +93,17 @@ export default function AutoScrollEvents({
             );
 
             /*
-              Larger event stacks move
-              more slowly so text remains
-              readable from across the room.
+              Allow roughly the same visual
+              reading speed regardless of
+              how long the title is.
             */
 
             setDuration(
               Math.max(
-                14,
-                10 +
+                12,
+                9 +
                   nextDistance /
-                    10
+                    16
               )
             );
           }
@@ -120,7 +122,7 @@ export default function AutoScrollEvents({
     );
 
     observer.observe(
-      track
+      content
     );
 
     window.addEventListener(
@@ -157,28 +159,28 @@ export default function AutoScrollEvents({
     ScrollStyle | undefined =
     active
       ? {
-          "--day-scroll-distance":
+          "--event-scroll-distance":
             `${distance}px`,
 
-          "--day-scroll-duration":
+          "--event-scroll-duration":
             `${duration}s`,
         }
       : undefined;
 
   return (
-    <div
+    <span
       ref={
         viewportRef
       }
-      className="dayEventsViewport"
+      className={`eventTextViewport ${className}`.trim()}
     >
-      <div
+      <span
         ref={
-          trackRef
+          contentRef
         }
-        className={`dayEventsTrack ${
+        className={`eventTextScroller ${
           active
-            ? "dayEventsTrackActive"
+            ? "eventTextScrollerActive"
             : ""
         }`.trim()}
         style={
@@ -186,7 +188,7 @@ export default function AutoScrollEvents({
         }
       >
         {children}
-      </div>
-    </div>
+      </span>
+    </span>
   );
 }

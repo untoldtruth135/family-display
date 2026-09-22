@@ -7,6 +7,14 @@ import {
 
 type CurrentWeather = {
   temperature: number;
+
+  /*
+    Optional so an older cached response
+    remains safe during an upgrade.
+  */
+  feelsLike?: number;
+  precipitationProbability?: number;
+
   weatherCode: number;
   condition: string;
   icon: string;
@@ -464,6 +472,53 @@ export default function WeatherPanels({
                     .condition
                 }
               </div>
+
+              {(
+                Number.isFinite(
+                  weather
+                    .current
+                    .feelsLike
+                ) ||
+                Number.isFinite(
+                  weather
+                    .current
+                    .precipitationProbability
+                )
+              ) && (
+                <div className="weatherMeta">
+                  {Number.isFinite(
+                    weather
+                      .current
+                      .feelsLike
+                  ) && (
+                    <span>
+                      Feels{" "}
+                      {
+                        weather
+                          .current
+                          .feelsLike
+                      }
+                      °
+                    </span>
+                  )}
+
+                  {Number.isFinite(
+                    weather
+                      .current
+                      .precipitationProbability
+                  ) && (
+                    <span>
+                      Rain{" "}
+                      {
+                        weather
+                          .current
+                          .precipitationProbability
+                      }
+                      %
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="weatherLocation">
                 {

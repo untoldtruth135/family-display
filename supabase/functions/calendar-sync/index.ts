@@ -988,6 +988,9 @@ async function syncHousehold(
     [];
 
 
+  let targetStartDate = "";
+  let targetEndExclusive = "";
+
   if (
     sources.length >
     0
@@ -1005,69 +1008,137 @@ async function syncHousehold(
 
 
     /*
-      The cache covers the current month plus
-      any following-month days required to
-      complete the final calendar week.
+      EIGHT-WEEK SYNC HORIZON
+
+      Row 1 = previous week
+      Row 2 = current week
+      Syncs six additional weeks beyond the current week
+
+      Dates are calculated in the household
+      display timezone, then converted into
+      UTC-safe date keys for Google filtering.
     */
 
-    const lastDayOfMonth =
+    const todayDateKey =
+      getLocalDateKey(
+        new Date()
+          .toISOString(),
+        timeZone
+      );
+
+
+    const [
+      todayYear,
+      todayMonth,
+      todayDay,
+    ] =
+      todayDateKey
+        .split("-")
+        .map(Number);
+
+
+    const todayUtc =
       new Date(
         Date.UTC(
-          year,
-          month,
-          0
+          todayYear,
+          todayMonth - 1,
+          todayDay
         )
       );
 
 
-    const trailingDays =
-      6 -
-      lastDayOfMonth
-        .getUTCDay();
+    /*
+      Sunday beginning the current week.
+    */
 
-
-    const targetStartDate =
-      `${year}-${pad(
-        month
-      )}-01`;
-
-
-    const endExclusiveDate =
+    const currentWeekStart =
       new Date(
-        Date.UTC(
-          year,
-          month,
-          1 +
-            trailingDays
-        )
+        todayUtc
       );
 
+    currentWeekStart.setUTCDate(
+      currentWeekStart.getUTCDate() -
+        currentWeekStart.getUTCDay()
+    );
 
-    const targetEndExclusive =
+
+    /*
+      One full week before the current week.
+    */
+
+    const gridStart =
+      new Date(
+        currentWeekStart
+      );
+
+    gridStart.setUTCDate(
+      gridStart.getUTCDate() -
+        7
+    );
+
+
+    /*
+      Eight complete weeks = 56 calendar days.
+    */
+
+    const gridEndExclusive =
+      new Date(
+        gridStart
+      );
+
+    gridEndExclusive.setUTCDate(
+      gridEndExclusive.getUTCDate() +
+        56
+    );
+
+
+    targetStartDate =
       [
-        endExclusiveDate
+        gridStart
           .getUTCFullYear(),
 
         pad(
-          endExclusiveDate
+          gridStart
             .getUTCMonth() +
             1
         ),
 
         pad(
-          endExclusiveDate
+          gridStart
             .getUTCDate()
         ),
       ].join("-");
 
 
+    targetEndExclusive =
+      [
+        gridEndExclusive
+          .getUTCFullYear(),
+
+        pad(
+          gridEndExclusive
+            .getUTCMonth() +
+            1
+        ),
+
+        pad(
+          gridEndExclusive
+            .getUTCDate()
+        ),
+      ].join("-");
+
+
+    /*
+      Ask Google for one extra day on either side
+      to protect against timezone-boundary events.
+
+      loadOneCalendar still filters the final
+      results to the exact 56-day sync range.
+    */
+
     const timeMin =
       new Date(
-        Date.UTC(
-          year,
-          month - 1,
-          1
-        ) -
+        gridStart.getTime() -
           24 *
             60 *
             60 *
@@ -1075,17 +1146,9 @@ async function syncHousehold(
       ).toISOString();
 
 
-    /*
-      One extra day around the Google API
-      request avoids timezone-boundary misses.
-      The date-key filter below still limits
-      what actually enters the cache.
-    */
-
     const timeMax =
       new Date(
-        endExclusiveDate
-          .getTime() +
+        gridEndExclusive.getTime() +
           24 *
             60 *
             60 *
@@ -1156,6 +1219,12 @@ async function syncHousehold(
 
 
   const payload = {
+    rangeStart:
+      targetStartDate,
+
+    rangeEndExclusive:
+      targetEndExclusive,
+
     calendars:
       sources.map(
         (

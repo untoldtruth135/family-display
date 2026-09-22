@@ -196,6 +196,103 @@ export async function GET(
 
     /*
       -------------------------------------------------------
+      SCHEDULED FAMILY MESSAGES
+      -------------------------------------------------------
+
+      Return active and future enabled messages.
+
+      The display itself decides exactly when each
+      message starts and ends using its local clock.
+    */
+
+    const nowIso =
+      new Date()
+        .toISOString();
+
+
+    const {
+      data:
+        scheduledMessageRows,
+      error:
+        scheduledMessageError,
+    } =
+      await supabase
+        .from(
+          "scheduled_messages"
+        )
+        .select(
+          `
+          id,
+          message,
+          starts_at,
+          ends_at,
+          priority
+          `
+        )
+        .eq(
+          "household_id",
+          display.household_id
+        )
+        .eq(
+          "enabled",
+          true
+        )
+        .or(
+          `ends_at.is.null,ends_at.gt.${nowIso}`
+        )
+        .order(
+          "priority",
+          {
+            ascending:
+              false,
+          }
+        )
+        .order(
+          "starts_at",
+          {
+            ascending:
+              true,
+          }
+        );
+
+
+    if (
+      scheduledMessageError
+    ) {
+      throw new Error(
+        `Scheduled message query failed: ${scheduledMessageError.message}`
+      );
+    }
+
+
+    const scheduledMessages =
+      (
+        scheduledMessageRows ??
+        []
+      ).map(
+        (
+          row
+        ) => ({
+          id:
+            row.id,
+
+          message:
+            row.message,
+
+          startsAt:
+            row.starts_at,
+
+          endsAt:
+            row.ends_at,
+
+          priority:
+            row.priority,
+        })
+      );
+
+
+    /*
+      -------------------------------------------------------
       RESPONSE
       -------------------------------------------------------
     */
@@ -231,6 +328,8 @@ export async function GET(
             settings
               ?.message_expires_at ??
             null,
+
+          scheduledMessages,
 
           orientation:
             display.orientation,

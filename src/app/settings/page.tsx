@@ -11,6 +11,7 @@ import type { User } from "@supabase/supabase-js";
 import DisplayPairingManager from "@/components/DisplayPairingManager";
 
 import ScheduleManager from "@/components/ScheduleManager";
+import ScheduledMessageManager from "@/components/ScheduledMessageManager";
 
 import GoogleCalendarConnect from "@/components/GoogleCalendarConnect";
 
@@ -2381,6 +2382,40 @@ export default function SettingsPage() {
     />
   )}
 </section>
+
+          {/* =================================================
+              SCHEDULED FAMILY MESSAGES
+          ================================================= */}
+
+<section
+  className={
+    styles.settingsSection
+  }
+>
+  <div
+    className={
+      styles.sectionHeader
+    }
+  >
+    <h2>
+      Scheduled Family Messages
+    </h2>
+
+    <p>
+      Automatically show a family message
+      during a specific date and time window.
+    </p>
+  </div>
+
+  {householdId && (
+    <ScheduledMessageManager
+      householdId={
+        householdId
+      }
+    />
+  )}
+</section>
+
 
           {/* =================================================
               STATUS

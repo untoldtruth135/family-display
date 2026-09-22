@@ -2352,3 +2352,1248 @@ select {
 .eventTime {
   color: #111111 !important;
 }
+/* =========================================================
+   OCTOBER DASHBOARD POLISH
+   Local development - do not deploy yet
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   CENTER CALENDAR HEADER
+   --------------------------------------------------------- */
+
+.calendarHeader {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+}
+
+.calendarHeader > div:first-child {
+  text-align: center;
+}
+
+.calendarTitle {
+  text-align: center;
+}
+
+.calendarSubtitle {
+  text-align: center;
+}
+
+/*
+  Keep the Live indicator on the right
+  without letting it push the title off-center.
+*/
+
+.headerActions {
+  position: absolute;
+
+  right: 1.2vw;
+  top: 50%;
+
+  transform: translateY(-50%);
+}
+
+
+/* ---------------------------------------------------------
+   COMPACT CURRENT WEATHER
+   --------------------------------------------------------- */
+
+.currentWeather {
+  grid-template-columns:
+    70px
+    minmax(0, 1fr);
+
+  column-gap: 10px;
+
+  padding:
+    8px
+    12px;
+}
+
+.weatherIcon {
+  width: 70px;
+  height: 70px;
+
+  font-size: 46px;
+}
+
+.temperature {
+  font-size: clamp(
+    36px,
+    3.4vw,
+    54px
+  );
+
+  line-height: 0.95;
+}
+
+.condition {
+  font-size: clamp(
+    15px,
+    1.25vw,
+    20px
+  );
+
+  line-height: 1.05;
+}
+
+.weatherLocation {
+  width: 100%;
+
+  font-size: clamp(
+    10px,
+    0.8vw,
+    12px
+  );
+
+  line-height: 1.1;
+
+  opacity: 0.85;
+
+  white-space: nowrap;
+
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* =========================================================
+   HORIZONTAL EVENT TEXT SCROLLING
+   Local October update
+   ========================================================= */
+
+/*
+  The viewport stays inside the calendar cell.
+*/
+
+.eventTextViewport {
+  display: block;
+
+  min-width: 0;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+}
+
+
+/*
+  Short event names remain completely stationary.
+*/
+
+.eventTextScroller {
+  display: inline-block;
+
+  min-width: max-content;
+
+  white-space: nowrap;
+
+  transform:
+    translateX(0);
+}
+
+
+/*
+  This class is added only when JavaScript detects
+  that the text is wider than its available space.
+*/
+
+.eventTextScrollerActive {
+  animation:
+    eventTextPingPong
+    var(
+      --event-scroll-duration
+    )
+    ease-in-out
+    infinite;
+}
+
+
+/*
+  Pause at the beginning,
+  travel left,
+  pause at the end,
+  return right,
+  then pause again.
+*/
+
+@keyframes eventTextPingPong {
+  0%,
+  14% {
+    transform:
+      translateX(0);
+  }
+
+  44%,
+  56% {
+    transform:
+      translateX(
+        calc(
+          -1 *
+          var(
+            --event-scroll-distance
+          )
+        )
+      );
+  }
+
+  86%,
+  100% {
+    transform:
+      translateX(0);
+  }
+}
+
+
+/* ---------------------------------------------------------
+   TIMED EVENTS
+   --------------------------------------------------------- */
+
+.eventDot {
+  min-width: 0;
+
+  overflow: hidden;
+}
+
+.eventDot > .dot {
+  flex:
+    0 0 auto;
+}
+
+.eventDotContent {
+  min-width: 0;
+
+  flex:
+    1 1 auto;
+
+  display: flex;
+
+  align-items:
+    baseline;
+
+  gap:
+    0.25em;
+
+  overflow:
+    hidden;
+}
+
+
+/*
+  Keep the event time visible while only the
+  event title moves horizontally.
+*/
+
+.eventDotContent .eventTime {
+  flex:
+    0 0 auto;
+
+  white-space:
+    nowrap;
+}
+
+.eventDotContent .eventTextViewport {
+  flex:
+    1 1 auto;
+
+  min-width: 0;
+}
+
+
+/* ---------------------------------------------------------
+   ALL-DAY EVENTS
+   --------------------------------------------------------- */
+
+.eventBar .eventTextViewport {
+  width: 100%;
+}
+
+
+/*
+  Respect devices/users that request reduced motion.
+*/
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+  .eventTextScrollerActive {
+    animation:
+      none;
+  }
+}
+
+cat >> src/app/globals.css <<'EOF'
+
+/* =========================================================
+   ROLLING SIX-WEEK CALENDAR
+   Local October update
+   ========================================================= */
+
+
+/*
+  Dates outside the current calendar month
+  remain visible but receive a very subtle
+  distinction.
+*/
+
+.calendarCell.otherMonthCell {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.035
+    );
+}
+
+
+/*
+  Row 2 is always the current week.
+*/
+
+.calendarCell.currentWeekCell {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.16
+    );
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.35
+    );
+
+  border-bottom:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.35
+    );
+}
+
+
+/*
+  Today remains the strongest visual cue.
+*/
+
+.calendarCell.currentWeekCell.todayCell {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.24
+    );
+}
+
+
+/*
+  Out-of-month numbers remain readable.
+*/
+
+.calendarCell .dayNumber.otherMonthNumber {
+  color:
+    #111111 !important;
+
+  opacity:
+    0.78;
+}
+
+
+/*
+  The first day of a month is slightly stronger
+  because its label includes the month name.
+*/
+
+.calendarCell .dayNumber {
+  white-space:
+    nowrap;
+}
+
+/* =========================================================
+   WEATHER DETAIL UPGRADE
+   Local October update
+   ========================================================= */
+
+.weatherMeta {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap:
+    0.8em;
+
+  margin-top:
+    2px;
+
+  color:
+    #111111;
+
+  font-size:
+    clamp(
+      10px,
+      0.8vw,
+      13px
+    );
+
+  line-height:
+    1.05;
+
+  white-space:
+    nowrap;
+}
+
+.weatherMeta span {
+  white-space:
+    nowrap;
+}
+
+/* =========================================================
+   TODAY AGENDA
+   Local October update
+   ========================================================= */
+
+.messageCardWithAgenda {
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content:
+    flex-start;
+
+  padding:
+    1.2vh
+    1vw
+    3.4vh;
+
+  overflow:
+    hidden;
+}
+
+
+/* Keep agenda above the decorative mountains. */
+
+.todayAgenda {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  width:
+    100%;
+
+  flex:
+    0 0 auto;
+}
+
+
+.todayAgendaHeader {
+  margin-bottom:
+    0.55vh;
+
+  color:
+    #111111;
+
+  font-size:
+    clamp(
+      11px,
+      0.85vw,
+      15px
+    );
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    0.12em;
+
+  text-align:
+    left;
+}
+
+
+.todayAgendaList {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    0.38vh;
+
+  width:
+    100%;
+}
+
+
+.todayAgendaItem {
+  display: flex;
+
+  align-items:
+    baseline;
+
+  gap:
+    0.45em;
+
+  min-width:
+    0;
+
+  color:
+    #111111;
+
+  font-size:
+    clamp(
+      9px,
+      0.68vw,
+      13px
+    );
+
+  line-height:
+    1.2;
+}
+
+
+.todayAgendaTime {
+  flex:
+    0 0 auto;
+
+  font-weight:
+    700;
+
+  white-space:
+    nowrap;
+}
+
+
+.todayAgendaTitle {
+  flex:
+    1 1 auto;
+
+  min-width:
+    0;
+
+  font-weight:
+    500;
+}
+
+
+.todayAgendaMore {
+  margin-top:
+    0.25vh;
+
+  color:
+    #111111;
+
+  font-size:
+    clamp(
+      9px,
+      0.62vw,
+      12px
+    );
+
+  font-style:
+    italic;
+
+  opacity:
+    0.75;
+
+  text-align:
+    left;
+}
+
+
+.todayAgendaDivider {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  width:
+    90%;
+
+  height:
+    1px;
+
+  flex:
+    0 0 auto;
+
+  margin:
+    1vh auto;
+
+  background:
+    rgba(
+      17,
+      17,
+      17,
+      0.22
+    );
+}
+
+
+/*
+  Once the card contains an agenda,
+  slightly reduce the quote size so
+  both sections remain comfortable.
+*/
+
+.messageCardWithAgenda .messageText {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  flex:
+    1 1 auto;
+
+  display: flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  min-height:
+    0;
+
+  font-size:
+    clamp(
+      15px,
+      1.35vw,
+      25px
+    );
+
+  line-height:
+    1.35;
+
+  overflow:
+    hidden;
+}
+
+/* =========================================================
+   TODAY AGENDA / MESSAGE CARD POLISH
+   Local October update
+   ========================================================= */
+
+.todayAgendaHeader {
+  width: 100%;
+
+  margin-bottom:
+    0.65vh;
+
+  text-align:
+    center;
+
+  font-size:
+    clamp(
+      12px,
+      0.9vw,
+      16px
+    );
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    0.14em;
+}
+
+
+/*
+  Stronger visual separation between
+  today's agenda and the family message.
+*/
+
+.todayAgendaDivider {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  width:
+    88%;
+
+  height:
+    2px;
+
+  flex:
+    0 0 auto;
+
+  margin:
+    0.9vh
+    auto
+    1.15vh;
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(
+      17,
+      17,
+      17,
+      0.42
+    );
+
+  box-shadow:
+    0 1px 2px
+    rgba(
+      255,
+      255,
+      255,
+      0.28
+    );
+}
+
+
+/*
+  Give the quote a little more breathing room
+  and keep the citation away from the mountains.
+*/
+
+.messageCardWithAgenda .messageText {
+  padding:
+    0
+    0.45vw
+    2.2vh;
+
+  font-size:
+    clamp(
+      14px,
+      1.22vw,
+      23px
+    );
+
+  line-height:
+    1.32;
+
+  text-align:
+    center;
+}
+
+/* =========================================================
+   COMPACT CLOCK CARD
+   Local October update
+   ========================================================= */
+
+.clockCard {
+  padding:
+    0.75vh
+    1vw;
+}
+
+.clockCard .greeting {
+  margin-bottom:
+    0.15vh;
+}
+
+.clockCard .clock {
+  line-height:
+    0.95;
+}
+
+.clockCard .date {
+  margin-top:
+    0.35vh;
+}
+
+/* =========================================================
+   EVENT SCROLLING - FINAL POLISH
+   Local October update
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   HORIZONTAL TITLE SCROLL
+   --------------------------------------------------------- */
+
+.eventTextViewport {
+  display: block;
+
+  min-width: 0;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+}
+
+.eventTextScroller {
+  display: inline-block;
+
+  min-width: max-content;
+
+  white-space: nowrap;
+
+  transform:
+    translate3d(
+      0,
+      0,
+      0
+    );
+
+  will-change:
+    transform;
+}
+
+.eventTextScrollerActive {
+  animation:
+    eventTextPingPong
+    var(
+      --event-scroll-duration,
+      12s
+    )
+    ease-in-out
+    infinite;
+}
+
+
+/*
+  0–20%    read beginning
+  20–42%   move left
+  42–58%   read ending
+  58–80%   return
+  80–100%  read beginning again
+*/
+
+@keyframes eventTextPingPong {
+  0%,
+  20% {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+
+  42%,
+  58% {
+    transform:
+      translate3d(
+        calc(
+          -1 *
+          var(
+            --event-scroll-distance
+          )
+        ),
+        0,
+        0
+      );
+  }
+
+  80%,
+  100% {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+}
+
+
+/* ---------------------------------------------------------
+   VERTICAL BUSY-DAY SCROLL
+   --------------------------------------------------------- */
+
+.dayEventsViewport {
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  flex:
+    1 1 auto;
+
+  overflow: hidden;
+}
+
+.dayEventsTrack {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    4px;
+
+  width: 100%;
+
+  min-width: 0;
+
+  transform:
+    translate3d(
+      0,
+      0,
+      0
+    );
+
+  will-change:
+    transform;
+}
+
+.dayEventsTrackActive {
+  animation:
+    dayEventsPingPong
+    var(
+      --day-scroll-duration,
+      14s
+    )
+    ease-in-out
+    infinite;
+}
+
+
+/*
+  The top and bottom of a busy day each get
+  a meaningful reading pause.
+*/
+
+@keyframes dayEventsPingPong {
+  0%,
+  22% {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+
+  43%,
+  57% {
+    transform:
+      translate3d(
+        0,
+        calc(
+          -1 *
+          var(
+            --day-scroll-distance
+          )
+        ),
+        0
+      );
+  }
+
+  78%,
+  100% {
+    transform:
+      translate3d(
+        0,
+        0,
+        0
+      );
+  }
+}
+
+
+/* ---------------------------------------------------------
+   EVENT STRUCTURE
+   --------------------------------------------------------- */
+
+.eventBar,
+.eventDot {
+  min-width: 0;
+}
+
+.eventBar .eventTextViewport {
+  width: 100%;
+}
+
+.eventDot {
+  overflow: hidden;
+}
+
+.eventDotContent {
+  min-width: 0;
+
+  flex:
+    1 1 auto;
+
+  display: flex;
+
+  align-items:
+    baseline;
+
+  gap:
+    0.25em;
+
+  overflow:
+    hidden;
+}
+
+.eventDotContent .eventTime {
+  flex:
+    0 0 auto;
+
+  white-space:
+    nowrap;
+}
+
+.eventDotContent .eventTextViewport {
+  flex:
+    1 1 auto;
+
+  min-width: 0;
+}
+
+
+/* ---------------------------------------------------------
+   REDUCED MOTION
+   --------------------------------------------------------- */
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+  .eventTextScrollerActive,
+  .dayEventsTrackActive {
+    animation:
+      none;
+  }
+}
+
+/* =========================================================
+   SCHEDULED FAMILY MESSAGES
+   Local October update
+   ========================================================= */
+
+.scheduledMessageManager {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    16px;
+}
+
+
+.scheduledMessageForm {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    14px;
+
+  align-items:
+    end;
+}
+
+
+.scheduledMessageForm label {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+
+  font-weight:
+    600;
+}
+
+
+.scheduledMessageTextField {
+  grid-column:
+    1 /
+    -1;
+}
+
+
+.scheduledMessageForm textarea,
+.scheduledMessageForm input {
+  width: 100%;
+
+  box-sizing:
+    border-box;
+
+  padding:
+    10px
+    12px;
+
+  border:
+    1px solid
+    rgba(
+      100,
+      110,
+      120,
+      0.35
+    );
+
+  border-radius:
+    8px;
+
+  font:
+    inherit;
+}
+
+
+.scheduledMessageTextField textarea {
+  resize:
+    vertical;
+}
+
+
+.scheduledMessageForm small {
+  font-size:
+    11px;
+
+  opacity:
+    0.65;
+}
+
+
+.scheduledMessageFormButtons {
+  display: flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+}
+
+
+.scheduledMessageList {
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    10px;
+}
+
+
+.scheduledMessageRow {
+  display: flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    14px;
+
+  padding:
+    12px;
+
+  border:
+    1px solid
+    rgba(
+      100,
+      110,
+      120,
+      0.25
+    );
+
+  border-radius:
+    10px;
+}
+
+
+.scheduledMessageBody {
+  flex:
+    1 1 auto;
+
+  min-width:
+    0;
+}
+
+
+.scheduledMessageCopy {
+  font-weight:
+    700;
+
+  margin-bottom:
+    5px;
+}
+
+
+.scheduledMessageDates,
+.scheduledMessagePriority {
+  font-size:
+    12px;
+
+  opacity:
+    0.75;
+}
+
+
+@media (
+  max-width:
+    700px
+) {
+  .scheduledMessageForm {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .scheduledMessageTextField {
+    grid-column:
+      auto;
+  }
+
+
+  .scheduledMessageRow {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+  }
+
+
+  .scheduledMessageRow .scheduleButtons {
+    width:
+      100%;
+
+    flex-wrap:
+      wrap;
+  }
+}
+
+/* =========================================================
+   SCHEDULED MESSAGE FORM ALIGNMENT
+   ========================================================= */
+
+.scheduledMessageForm {
+  align-items: start;
+}
+
+.scheduledMessageFormButtons {
+  align-self: start;
+}
