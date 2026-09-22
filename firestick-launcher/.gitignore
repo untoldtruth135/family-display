@@ -1,0 +1,23 @@
+# Local Android SDK path
+local.properties
+
+# Gradle caches
+.gradle/
+
+# Build output
+build/
+app/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Native build output
+.cxx/
+.externalNativeBuild/
+
+# Miscellaneous
+captures/
+.DS_Store
+*.apk
+*.aab

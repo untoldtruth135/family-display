@@ -1,0 +1,24 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.familydisplay.launcher'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.familydisplay.launcher"
+
+        minSdk 21
+        targetSdk 35
+
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
