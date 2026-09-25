@@ -97,9 +97,12 @@ export default function RotatingBackground({
       number | undefined;
 
     const normalDelay =
+      24 *
       60 *
       60 *
       1000;
+
+    const expirationMargin = 60 * 60 * 1000;
 
     const maxFailureDelay =
       60 *
@@ -115,15 +118,13 @@ export default function RotatingBackground({
       "family-display:backgrounds";
 
     /*
-      Background URLs are signed for
-      three hours.
-
-      We will only restore a cached
-      manifest if it is less than two
-      hours old.
+      Reuse signed URLs for 24 hours, refreshing at least one hour
+      before expiration. Old manifests without expiresAt must be
+      fetched again because their URLs were only valid for three hours.
+      A valid but overdue manifest can still display during a retry.
     */
 
-    function restoreCachedPhotos() {
+    function restoreCachedPhotos(): number | null {
       try {
         const raw =
           sessionStorage.getItem(
@@ -131,7 +132,7 @@ export default function RotatingBackground({
           );
 
         if (!raw) {
-          return false;
+          return null;
         }
 
         const cached =
@@ -142,16 +143,17 @@ export default function RotatingBackground({
             cached?.savedAt
           );
 
+        const expiresAt = Number(cached?.expiresAt);
+        const now = Date.now();
+
         if (
-          !savedAt ||
-          Date.now() -
-            savedAt >
-            2 *
-              60 *
-              60 *
-              1000
+          !Number.isFinite(savedAt) ||
+          savedAt <= 0 ||
+          savedAt > now ||
+          !Number.isFinite(expiresAt) ||
+          expiresAt - expirationMargin <= now
         ) {
-          return false;
+          return null;
         }
 
         if (
@@ -159,7 +161,7 @@ export default function RotatingBackground({
             cached?.photos
           )
         ) {
-          return false;
+          return null;
         }
 
         const restored =
@@ -176,9 +178,12 @@ export default function RotatingBackground({
 
         setIndex(0);
 
-        return true;
+        return Math.max(
+          0,
+          Math.min(savedAt + normalDelay, expiresAt - expirationMargin) - now
+        );
       } catch {
-        return false;
+        return null;
       }
     }
 
@@ -245,6 +250,14 @@ export default function RotatingBackground({
           return;
         }
 
+        const expiresAt = Number(data.expiresAt);
+        if (
+          !Number.isFinite(expiresAt) ||
+          expiresAt - expirationMargin <= Date.now()
+        ) {
+          throw new Error("Background manifest expiration is missing or too soon.");
+        }
+
         setPhotos(
           shuffle
             ? shufflePhotos(
@@ -262,6 +275,8 @@ export default function RotatingBackground({
               savedAt:
                 Date.now(),
 
+              expiresAt,
+
               photos:
                 loaded,
             })
@@ -277,7 +292,10 @@ export default function RotatingBackground({
           1000;
 
         scheduleNext(
-          normalDelay
+          Math.max(
+            0,
+            Math.min(normalDelay, expiresAt - expirationMargin - Date.now())
+          )
         );
       } catch (
         error
@@ -307,13 +325,16 @@ export default function RotatingBackground({
     }
 
     /*
-      If a recently signed manifest is
-      available, show it immediately.
+      Resume the original refresh deadline rather than renewing URLs
+      on every reload, visibility change, or wake from scheduled sleep.
     */
 
-    restoreCachedPhotos();
-
-    loadPhotos();
+    const remainingDelay = restoreCachedPhotos();
+    if (remainingDelay !== null && remainingDelay > 0) {
+      scheduleNext(remainingDelay);
+    } else {
+      void loadPhotos();
+    }
 
     return () => {
       cancelled =

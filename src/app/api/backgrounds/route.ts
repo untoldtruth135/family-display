@@ -11,6 +11,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const BUCKET = "background-photos";
+const SIGNED_URL_LIFETIME_SECONDS = 7 * 24 * 60 * 60;
 
 export async function GET(
   request: NextRequest
@@ -112,6 +113,9 @@ export async function GET(
       url: string;
     }> = [];
 
+    // Start before signing so this conservatively covers every photo's expiry.
+    const expiresAt = Date.now() + SIGNED_URL_LIFETIME_SECONDS * 1000;
+
     for (
       const photo of matchingPhotos
     ) {
@@ -123,7 +127,7 @@ export async function GET(
           .from(BUCKET)
           .createSignedUrl(
             photo.storage_path,
-            3 * 60 * 60
+            SIGNED_URL_LIFETIME_SECONDS
           );
 
       if (signedUrlError) {
@@ -152,6 +156,7 @@ export async function GET(
     return NextResponse.json(
       {
         photos,
+        expiresAt,
       },
       {
         headers: {
