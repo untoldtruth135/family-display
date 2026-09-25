@@ -8,6 +8,11 @@ import {
   getDisplayServerSupabase,
 } from "@/lib/display-auth-server";
 
+import {
+  loadCalendarCache,
+  type CalendarCacheRow,
+} from "@/lib/calendar-cache";
+
 export const dynamic =
   "force-dynamic";
 
@@ -31,29 +36,6 @@ const CACHE_STALE_MS =
   5 *
   60 *
   1000;
-
-type CalendarPayload = {
-  calendars: unknown[];
-  events: unknown[];
-};
-
-type CalendarCacheRow = {
-  payload:
-    | CalendarPayload
-    | null;
-
-  content_hash:
-    | string
-    | null;
-
-  synced_at:
-    | string
-    | null;
-
-  sync_error:
-    | string
-    | null;
-};
 
 function cacheIsStale(
   syncedAt:
@@ -236,47 +218,17 @@ export async function GET(
       calendar_cache
     */
 
-    const {
-      data,
-      error,
-    } =
-      await supabase
-        .from(
-          "calendar_cache"
-        )
-        .select(
-          `
-          payload,
-          content_hash,
-          synced_at,
-          sync_error
-          `
-        )
-        .eq(
-          "household_id",
-          householdId
-        )
-        .eq(
-          "year",
-          year
-        )
-        .eq(
-          "month",
-          month
-        )
-        .maybeSingle();
-
-    if (error) {
-      throw new Error(
-        `Calendar cache query failed: ${error.message}`
-      );
-    }
+    const data = await loadCalendarCache(
+      supabase,
+      householdId,
+      year,
+      month,
+      display.timezone ?? "America/Los_Angeles"
+    );
 
     /*
-      This can occur briefly at the beginning
-      of a new month before the next Supabase
-      Cron synchronization has created the
-      new month's cache row.
+      Neither the requested month's row nor a cache covering
+      the current 28-day display range is available.
 
       We do NOT fall back to Google here.
     */
@@ -305,7 +257,7 @@ export async function GET(
     }
 
     return calendarResponse(
-      data as CalendarCacheRow
+      data
     );
   } catch (
     error
