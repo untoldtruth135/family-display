@@ -60,7 +60,7 @@ export default function AutoScrollEvents({
     let frame:
       number | undefined;
 
-    function measure() {
+    const measure = () => {
       if (
         frame !==
         undefined
@@ -106,7 +106,7 @@ export default function AutoScrollEvents({
             );
           }
         );
-    }
+    };
 
     measure();
 
