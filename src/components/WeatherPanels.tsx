@@ -1,5 +1,7 @@
 "use client";
 
+import { WEATHER_REFRESH_MS, WEATHER_OUTAGE_MS, weatherCacheAge, weatherRefreshDelay } from "@/lib/weather-cache";
+
 import {
   useEffect,
   useState,
@@ -111,10 +113,8 @@ export default function WeatherPanels({
     let timer:
       number | undefined;
 
-    const normalDelay =
-      120 *
-      60 *
-      1000;
+    const normalDelay = WEATHER_REFRESH_MS;
+    let restoredSavedAt = 0;
 
     const maxFailureDelay =
       120 *
@@ -174,13 +174,7 @@ export default function WeatherPanels({
           );
 
         if (
-          !savedAt ||
-          Date.now() -
-            savedAt >
-            12 *
-              60 *
-              60 *
-              1000
+          weatherCacheAge(savedAt) > WEATHER_OUTAGE_MS
         ) {
           return false;
         }
@@ -196,6 +190,8 @@ export default function WeatherPanels({
           return false;
         }
 
+        restoredSavedAt = savedAt;
+        setError("");
         setWeather(
           cached.data as
             WeatherResponse
@@ -353,9 +349,10 @@ export default function WeatherPanels({
       is being retrieved.
     */
 
-    restoreCachedWeather();
-
-    loadWeather();
+    const restored = restoreCachedWeather();
+    const remaining = restored ? weatherRefreshDelay(restoredSavedAt) : 0;
+    if (remaining > 0) scheduleNext(remaining);
+    else void loadWeather();
 
     return () => {
       cancelled =

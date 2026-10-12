@@ -10,6 +10,8 @@ import {
 
 import {
   loadCalendarCache,
+  loadCalendarVersion,
+  calendarEtagMatches,
   type CalendarCacheRow,
 } from "@/lib/calendar-cache";
 
@@ -33,7 +35,7 @@ export const runtime =
 */
 
 const CACHE_STALE_MS =
-  5 *
+  15 *
   60 *
   1000;
 
@@ -218,6 +220,26 @@ export async function GET(
       calendar_cache
     */
 
+    const conditional = request.headers.get("if-none-match");
+    if (conditional) {
+      const version = await loadCalendarVersion(
+        supabase, householdId, year, month,
+        display.timezone ?? "America/Los_Angeles"
+      );
+      if (version && calendarEtagMatches(conditional, version.content_hash)) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            "Cache-Control": "private, no-store",
+            ETag: `"${version.content_hash}"`,
+            "X-Calendar-Cache": cacheIsStale(version.synced_at) ? "stale" : "fresh",
+            "X-Calendar-Synced-At": version.synced_at ?? "",
+            "X-Calendar-Sync-Error": version.sync_error ? "true" : "false",
+          },
+        });
+      }
+    }
+
     const data = await loadCalendarCache(
       supabase,
       householdId,
@@ -286,3 +308,4 @@ export async function GET(
     );
   }
 }
+

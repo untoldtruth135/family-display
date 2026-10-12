@@ -11,7 +11,7 @@ export default function RotatingBackground({ enabled, intervalSeconds, shuffle, 
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (!enabled) { setPhotos([]); return; }
+    if (!enabled || paused) { setPhotos([]); return; }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let objectUrls: string[] = [];
@@ -56,7 +56,7 @@ export default function RotatingBackground({ enabled, intervalSeconds, shuffle, 
     }
     void load();
     return () => { cancelled = true; controller.abort(); clearTimeout(timer); objectUrls.forEach((url) => URL.revokeObjectURL(url)); };
-  }, [enabled, shuffle]);
+  }, [enabled, shuffle, paused]);
 
   useEffect(() => {
     if (!enabled || paused || photos.length <= 1) return;
@@ -72,3 +72,4 @@ export default function RotatingBackground({ enabled, intervalSeconds, shuffle, 
     <div className="rotatingBackgroundOverlay" style={{ backgroundColor: "rgba(238, 241, 243, " + overlayOpacity + ")" }} />
   </div>;
 }
+

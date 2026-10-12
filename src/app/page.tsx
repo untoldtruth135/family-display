@@ -1125,6 +1125,8 @@ export default function Home() {
     const cacheKey =
       `family-display:calendar:${householdId}:${currentYear}-${currentMonth}`;
 
+    let calendarEtag: string | null = null;
+
     const realtimeTopic =
       `calendar:${householdId}`;
 
@@ -1181,6 +1183,8 @@ export default function Home() {
         ) {
           return false;
         }
+
+        calendarEtag = typeof cached.etag === "string" ? cached.etag : null;
 
         setCalendarEvents(
           cached.events
@@ -1245,8 +1249,18 @@ export default function Home() {
             {
               cache:
                 "no-store",
+              headers: calendarEtag ? { "If-None-Match": calendarEtag } : {},
             }
           );
+
+        if (response.status === 304 && calendarEtag) {
+          if (!cancelled) {
+            setCalendarError(false);
+            failureDelay = 60 * 1000;
+            scheduleFallback(normalFallbackDelay);
+          }
+          return;
+        }
 
         const data =
           await response
@@ -1284,6 +1298,8 @@ export default function Home() {
           return;
         }
 
+        calendarEtag = response.headers.get("ETag");
+
         const nextEvents =
           Array.isArray(
             data?.events
@@ -1310,6 +1326,7 @@ export default function Home() {
           sessionStorage.setItem(
             cacheKey,
             JSON.stringify({
+              etag: calendarEtag,
               savedAt:
                 Date.now(),
 
@@ -2685,3 +2702,4 @@ export default function Home() {
     </main>
   );
 }
+

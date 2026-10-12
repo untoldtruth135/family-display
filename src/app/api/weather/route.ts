@@ -4,7 +4,7 @@ import {
 } from "next/server";
 
 export const dynamic =
-  "force-dynamic";
+  "auto";
 
 type WeatherDescription = {
   condition: string;
@@ -13,6 +13,7 @@ type WeatherDescription = {
 
 async function fetchWithRetry(
   url: string,
+  revalidateSeconds: number,
   attempts = 3
 ) {
   let lastError:
@@ -39,8 +40,7 @@ async function fetchWithRetry(
         await fetch(
           url,
           {
-            cache:
-              "no-store",
+            next: { revalidate: revalidateSeconds },
 
             signal:
               controller.signal,
@@ -344,7 +344,8 @@ export async function GET(
 
     const geocodeResponse =
       await fetchWithRetry(
-        geocodeUrl.toString()
+        geocodeUrl.toString(),
+        24 * 60 * 60
       );
 
     if (
@@ -441,7 +442,8 @@ export async function GET(
 
     const forecastResponse =
       await fetchWithRetry(
-        forecastUrl.toString()
+        forecastUrl.toString(),
+        15 * 60
       );
 
     if (
@@ -702,7 +704,7 @@ export async function GET(
       {
         headers: {
           "Cache-Control":
-            "no-store, no-cache, must-revalidate",
+            "public, max-age=0, s-maxage=900, stale-while-revalidate=60",
         },
       }
     );
