@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 import {
   NextRequest,
   NextResponse,
@@ -109,6 +111,7 @@ export async function GET(
 
     const photos: Array<{
       id: string;
+      cacheKey: string;
       fileName: string;
       url: string;
     }> = [];
@@ -146,6 +149,7 @@ export async function GET(
 
       photos.push({
         id: photo.id,
+        cacheKey: createHash("sha256").update(photo.storage_path + ":" + photo.created_at).digest("hex"),
         fileName:
           photo.file_name,
         url:
@@ -156,6 +160,7 @@ export async function GET(
     return NextResponse.json(
       {
         photos,
+        scope: createHash("sha256").update(display.household_id + ":" + display.pairing_id).digest("hex"),
         expiresAt,
       },
       {

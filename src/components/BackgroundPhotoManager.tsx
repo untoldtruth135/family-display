@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import { optimizeBackgroundPhoto } from "@/lib/optimize-background-photo";
 import { supabase } from "@/lib/supabase-browser";
 
 type BackgroundPhoto = {
@@ -127,22 +128,18 @@ export default function BackgroundPhotoManager({
           );
         }
 
-        const extension =
-          file.name
-            .split(".")
-            .pop()
-            ?.toLowerCase() || "jpg";
-
+        const optimized = await optimizeBackgroundPhoto(file);
+        const extension = optimized.type === "image/webp" ? "webp" : optimized.type === "image/png" ? "png" : "jpg";
         const storagePath =
           `${householdId}/${crypto.randomUUID()}.${extension}`;
 
         const { error: uploadError } =
           await supabase.storage
             .from(BUCKET)
-            .upload(storagePath, file, {
-              cacheControl: "3600",
+            .upload(storagePath, optimized, {
+              cacheControl: "31536000",
               upsert: false,
-              contentType: file.type,
+              contentType: optimized.type,
             });
 
         if (uploadError) {
@@ -290,7 +287,7 @@ export default function BackgroundPhotoManager({
         </label>
 
         <span className="photoUploadHelp">
-          JPG, PNG or WebP. Maximum 10 MB each.
+          JPG, PNG or WebP. Maximum 10 MB each; automatically resized for the display.
         </span>
       </div>
 
