@@ -2411,8 +2411,12 @@ select {
   column-gap: 10px;
 
   padding:
-    8px
+    clamp(3px, 0.6vh, 8px)
     12px;
+}
+
+.weatherDetails {
+  gap: 1px;
 }
 
 .weatherIcon {
@@ -2424,8 +2428,8 @@ select {
 
 .temperature {
   font-size: clamp(
-    36px,
-    3.4vw,
+    24px,
+    min(3.4vw, 5vh),
     54px
   );
 
@@ -2434,24 +2438,24 @@ select {
 
 .condition {
   font-size: clamp(
-    15px,
-    1.25vw,
+    12px,
+    min(1.25vw, 2vh),
     20px
   );
 
-  line-height: 1.05;
+  line-height: 1.15;
 }
 
 .weatherLocation {
   width: 100%;
 
   font-size: clamp(
-    10px,
-    0.8vw,
+    9px,
+    min(0.8vw, 1.4vh),
     12px
   );
 
-  line-height: 1.1;
+  line-height: 1.25;
 
   opacity: 0.85;
 
@@ -2747,13 +2751,13 @@ cat >> src/app/globals.css <<'EOF'
 
   font-size:
     clamp(
-      10px,
-      0.8vw,
+      9px,
+      min(0.8vw, 1.35vh),
       13px
     );
 
   line-height:
-    1.05;
+    1.2;
 
   white-space:
     nowrap;

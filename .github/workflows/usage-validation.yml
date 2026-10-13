@@ -29,5 +29,23 @@ jobs:
         run: node --experimental-strip-types --test tests/*.test.mjs
       - name: Next.js build and type checks
         run: npm run build
+      - name: Install isolated browser test tools
+        env:
+          PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
+        run: |
+          npm install --prefix "$PLAYWRIGHT_PACKAGE_ROOT" --no-save --package-lock=false playwright@1.58.2
+          node "$PLAYWRIGHT_PACKAGE_ROOT/node_modules/playwright/cli.js" install --with-deps --only-shell chromium
+      - name: TV weather layout regression
+        env:
+          PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
+        run: node tests/tv-weather-layout.browser.mjs
+      - name: Save TV layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-weather-layout
+          path: artifacts/weather-layout/
+          if-no-files-found: ignore
+          retention-days: 7
 # Deliberately no deployment step, production secrets, or live database calls.
 
