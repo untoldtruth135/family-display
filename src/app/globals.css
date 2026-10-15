@@ -3601,3 +3601,42 @@ cat >> src/app/globals.css <<'EOF'
 .scheduledMessageFormButtons {
   align-self: start;
 }
+
+/* Today and Tomorrow share the existing card without crowding the quote. */
+.agendaDays {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: 100%;
+}
+.agendaDays .todayAgenda + .todayAgenda {
+  margin-top: clamp(4px, 0.8vh, 9px);
+  padding-top: clamp(4px, 0.8vh, 9px);
+  border-top: 1px solid rgba(17, 17, 17, 0.18);
+}
+.agendaEmpty {
+  font-size: clamp(9px, 0.68vw, 13px);
+  line-height: 1.2;
+  opacity: 0.75;
+  text-align: center;
+}
+.messageCardWithTwoDays {
+  padding: 1vh 1vw 1.5vh;
+}
+.messageCardWithTwoDays .todayAgendaHeader {
+  margin-bottom: 0.35vh;
+  font-size: clamp(11px, min(0.9vw, 2vh), 16px);
+}
+.messageCardWithTwoDays .todayAgendaItem,
+.messageCardWithTwoDays .todayAgendaMore,
+.messageCardWithTwoDays .agendaEmpty {
+  font-size: clamp(9px, min(0.68vw, 1.6vh), 13px);
+}
+.messageCardWithTwoDays .todayAgendaDivider {
+  margin: 0.65vh auto;
+}
+.messageCardWithTwoDays .messageText {
+  padding: 0 0.45vw 0.5vh;
+  font-size: clamp(12px, min(1.22vw, 2.2vh), 23px);
+  line-height: 1.25;
+}
