@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { getAgendaDateKeys, eventsForAgendaDay } from "@/lib/agenda-days";
 import WeatherPanels from "@/components/WeatherPanels";
 import RotatingBackground from "@/components/RotatingBackground";
 import AutoScrollEvents from "@/components/AutoScrollEvents";
@@ -1125,6 +1126,8 @@ export default function Home() {
     const cacheKey =
       `family-display:calendar:${householdId}:${currentYear}-${currentMonth}`;
 
+    let calendarEtag: string | null = null;
+
     const realtimeTopic =
       `calendar:${householdId}`;
 
@@ -1181,6 +1184,8 @@ export default function Home() {
         ) {
           return false;
         }
+
+        calendarEtag = typeof cached.etag === "string" ? cached.etag : null;
 
         setCalendarEvents(
           cached.events
@@ -1245,8 +1250,18 @@ export default function Home() {
             {
               cache:
                 "no-store",
+              headers: calendarEtag ? { "If-None-Match": calendarEtag } : {},
             }
           );
+
+        if (response.status === 304 && calendarEtag) {
+          if (!cancelled) {
+            setCalendarError(false);
+            failureDelay = 60 * 1000;
+            scheduleFallback(normalFallbackDelay);
+          }
+          return;
+        }
 
         const data =
           await response
@@ -1284,6 +1299,8 @@ export default function Home() {
           return;
         }
 
+        calendarEtag = response.headers.get("ETag");
+
         const nextEvents =
           Array.isArray(
             data?.events
@@ -1310,6 +1327,7 @@ export default function Home() {
           sessionStorage.setItem(
             cacheKey,
             JSON.stringify({
+              etag: calendarEtag,
               savedAt:
                 Date.now(),
 
@@ -1952,21 +1970,14 @@ export default function Home() {
     the Today / Family Message card.
   */
 
-  const sidebarTodayDateKey =
-    `${timezoneParts.year}-${pad(
-      timezoneParts.month
-    )}-${pad(
-      timezoneParts.day
-    )}`;
-
-  const sidebarHasTodayAgenda =
-    calendarEvents.some(
-      (
-        event
-      ) =>
-        event.date ===
-        sidebarTodayDateKey
-    );
+  const agendaDates = getAgendaDateKeys(timezoneParts.year, timezoneParts.month, timezoneParts.day);
+  const todayAgendaEvents = eventsForAgendaDay(calendarEvents, agendaDates.today);
+  const tomorrowAgendaEvents = eventsForAgendaDay(calendarEvents, agendaDates.tomorrow);
+  const showAgenda = showCalendar;
+  const agendaDays = [
+    { label: "TODAY", events: todayAgendaEvents },
+    { label: "TOMORROW", events: tomorrowAgendaEvents },
+  ];
 
   const sidebarRows:
     string[] = [];
@@ -1991,7 +2002,7 @@ export default function Home() {
 
   if (
     showMessage ||
-    sidebarHasTodayAgenda
+    showAgenda
   ) {
     sidebarRows.push(
       "3.05fr"
@@ -2037,55 +2048,6 @@ export default function Home() {
   /* =======================================================
      TODAY AGENDA
      ======================================================= */
-
-  const todayDateKey =
-    `${timezoneParts.year}-${pad(
-      timezoneParts.month
-    )}-${pad(
-      timezoneParts.day
-    )}`;
-
-
-  const todayAgendaEvents =
-    calendarEvents
-      .filter(
-        (
-          event
-        ) =>
-          event.date ===
-          todayDateKey
-      )
-      .sort(
-        (
-          first,
-          second
-        ) => {
-          if (
-            first.allDay !==
-            second.allDay
-          ) {
-            return first.allDay
-              ? -1
-              : 1;
-          }
-
-          return (
-            first.start ??
-            ""
-          ).localeCompare(
-            second.start ??
-            ""
-          );
-        }
-      );
-
-
-  const visibleTodayAgendaEvents =
-    todayAgendaEvents.slice(
-      0,
-      4
-    );
-
 
   return (
     <main
@@ -2222,88 +2184,39 @@ export default function Home() {
             }
           />
 
-          {/* TODAY AGENDA + MESSAGE */}
-
-          {(
-            showMessage ||
-            todayAgendaEvents.length >
-              0
-          ) && (
-            <section
-              className={`card messageCard ${
-                todayAgendaEvents.length >
-                  0
-                  ? "messageCardWithAgenda"
-                  : ""
-              }`}
-            >
-              {todayAgendaEvents.length >
-                0 && (
-                <div className="todayAgenda">
-                  <div className="todayAgendaHeader">
-                    TODAY
-                  </div>
-
-                  <div className="todayAgendaList">
-                    {visibleTodayAgendaEvents.map(
-                      (
-                        event
-                      ) => (
-                        <div
-                          className="todayAgendaItem"
-                          key={
-                            `agenda-${event.id}`
-                          }
-                        >
-                          <span className="todayAgendaTime">
-                            {event.allDay
-                              ? "ALL DAY"
-                              : event.start
-                                ? formatEventTime(
-                                    event.start,
-                                    timezone,
-                                    use24HourClock
-                                  )
-                                : ""}
-                          </span>
-
-                          <AutoScrollText className="todayAgendaTitle">
-                            {
-                              event.title
-                            }
-                          </AutoScrollText>
-                        </div>
-                      )
-                    )}
-
-                    {todayAgendaEvents.length >
-                      visibleTodayAgendaEvents.length && (
-                      <div className="todayAgendaMore">
-                        +
-                        {
-                          todayAgendaEvents.length -
-                          visibleTodayAgendaEvents.length
-                        }{" "}
-                        more
+          {/* TODAY + TOMORROW AGENDA ABOVE THE FAMILY MESSAGE */}
+          {(showMessage || showAgenda) && (
+            <section className={`card messageCard ${showAgenda ? "messageCardWithAgenda messageCardWithTwoDays" : ""}`}>
+              {showAgenda && (
+                <div className="agendaDays">
+                  {agendaDays.map(day => (
+                    <section className="todayAgenda" aria-label={day.label} key={day.label}>
+                      <div className="todayAgendaHeader">{day.label}</div>
+                      <div className="todayAgendaList">
+                        {day.events.slice(0, 2).map(event => (
+                          <div className="todayAgendaItem" key={`agenda-${day.label}-${event.id}`}>
+                            <span className="todayAgendaTime">
+                              {event.allDay ? "ALL DAY" : event.start
+                                ? formatEventTime(event.start, timezone, use24HourClock) : ""}
+                            </span>
+                            <AutoScrollText className="todayAgendaTitle">{event.title}</AutoScrollText>
+                          </div>
+                        ))}
+                        {day.events.length === 0 && (
+                          <div className="agendaEmpty">{calendarLoading ? "Loading…" : calendarError ? "Calendar unavailable" : "No events"}</div>
+                        )}
+                        {day.events.length > 2 && (
+                          <div className="todayAgendaMore">+{day.events.length - 2} more on calendar</div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </section>
+                  ))}
                 </div>
               )}
-
               {showMessage && (
                 <>
-                  {todayAgendaEvents.length >
-                    0 && (
-                    <div className="todayAgendaDivider" />
-                  )}
-
-                  <div className="messageText">
-                    {
-                      message ||
-                      " "
-                    }
-                  </div>
+                  {showAgenda && <div className="todayAgendaDivider" />}
+                  <div className="messageText">{message || " "}</div>
                 </>
               )}
 
@@ -2685,3 +2598,4 @@ export default function Home() {
     </main>
   );
 }
+

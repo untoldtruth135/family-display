@@ -99,3 +99,47 @@ export async function loadCalendarCache(
 
   return fallback as CalendarCacheRow;
 }
+
+export type CalendarCacheVersion = {
+  content_hash: string | null;
+  synced_at: string | null;
+  sync_error: string | null;
+  range_start?: string | null;
+  range_end?: string | null;
+};
+
+// Project only metadata. A 304 after reading "payload" would still cost Supabase egress.
+export async function loadCalendarVersion(
+  supabase: SupabaseClient,
+  householdId: string,
+  year: number,
+  month: number,
+  timeZone: string,
+  now = new Date()
+): Promise<CalendarCacheVersion | null> {
+  const columns = "content_hash,synced_at,sync_error,range_start:payload->>rangeStart,range_end:payload->>rangeEndExclusive";
+  const { data, error } = await supabase.from("calendar_cache").select(columns)
+    .eq("household_id", householdId).eq("year", year).eq("month", month).maybeSingle();
+  if (error) throw new Error(`Calendar version query failed: ${error.message}`);
+  if (data) return data as CalendarCacheVersion;
+  const range = getDisplayCalendarRange(now, timeZone);
+  if (year !== range.year || month !== range.month) return null;
+  const { data: fallback, error: fallbackError } = await supabase.from("calendar_cache")
+    .select(columns).eq("household_id", householdId)
+    .lte("payload->>rangeStart", range.rangeStart)
+    .gte("payload->>rangeEndExclusive", range.rangeEndExclusive)
+    .order("synced_at", { ascending: false, nullsFirst: false })
+    .order("year", { ascending: false }).order("month", { ascending: false })
+    .limit(1).maybeSingle();
+  if (fallbackError) throw new Error(`Calendar version fallback query failed: ${fallbackError.message}`);
+  if (!fallback?.range_start || !fallback?.range_end ||
+      fallback.range_start > range.rangeStart || fallback.range_end < range.rangeEndExclusive) return null;
+  return fallback as CalendarCacheVersion;
+}
+
+export function calendarEtagMatches(header: string | null, hash: string | null) {
+  if (!header || !hash) return false;
+  // GET permits weak comparison, but "*" would let a client with no saved data skip the body.
+  return header.split(",").some(value => value.trim().replace(/^W\//, "") === `"${hash}"`);
+}
+
