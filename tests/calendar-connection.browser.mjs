@@ -45,7 +45,7 @@ try {
   healthy = true;
   await page.clock.fastForward(61000);
   await page.getByText("Recovered family message", { exact: true }).waitFor();
-  assert.equal(await page.getByText("Calendar connection unavailable. Retrying automatically.", { exact: true }).count(), 0);
+  await page.getByText("Calendar connection unavailable. Retrying automatically.", { exact: true }).waitFor({ state: "hidden" });
   console.log("PASS configuration recovers automatically without reload or re-pairing");
   await page.close();
 } finally {

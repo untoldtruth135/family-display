@@ -1,4 +1,5 @@
 type ServerKeyEnvironment = {
+  [name: string]: string | undefined;
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_SECRET_KEYS?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
