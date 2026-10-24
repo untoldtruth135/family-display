@@ -1,7 +1,7 @@
 name: Usage validation
 on:
   push:
-    branches: [usage-quota-savings, fix-weather-freshness]
+    branches: [usage-quota-savings, fix-weather-freshness, fix-calendar-server-auth]
   pull_request:
     branches: [main]
 permissions:
@@ -43,6 +43,10 @@ jobs:
         env:
           PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
         run: node tests/weather-refresh.browser.mjs
+      - name: Calendar connection and recovery regression
+        env:
+          PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
+        run: node tests/calendar-connection.browser.mjs
       - name: Save TV layout screenshots
         if: always()
         uses: actions/upload-artifact@v4
