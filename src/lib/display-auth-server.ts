@@ -1,3 +1,4 @@
+import { resolveSupabaseServerKey } from "@/lib/supabase-server-key";
 import {
   createHash,
 } from "crypto";
@@ -26,10 +27,7 @@ function getServerSupabase() {
       .NEXT_PUBLIC_SUPABASE_URL;
 
   const serviceRoleKey =
-    process.env
-      .SUPABASE_SERVICE_ROLE_KEY ??
-    process.env
-      .SUPABASE_SECRET_KEY;
+    resolveSupabaseServerKey(process.env);
 
   if (!supabaseUrl) {
     throw new Error(

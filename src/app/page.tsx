@@ -2203,7 +2203,7 @@ export default function Home() {
                           </div>
                         ))}
                         {day.events.length === 0 && (
-                          <div className="agendaEmpty">{calendarLoading ? "Loading…" : calendarError ? "Calendar unavailable" : "No events"}</div>
+                          <div className="agendaEmpty">{calendarLoading ? "Loading…" : (calendarError || configError) ? "Calendar unavailable" : "No events"}</div>
                         )}
                         {day.events.length > 2 && (
                           <div className="todayAgendaMore">+{day.events.length - 2} more on calendar</div>
@@ -2511,7 +2511,9 @@ export default function Home() {
 
           <footer className="calendarFooter">
             <div className="calendarLegend">
-              {calendarSources.length >
+              {(configError || calendarError) ? (
+                <span role="status">Calendar connection unavailable. Retrying automatically.</span>
+              ) : calendarSources.length >
               0 ? (
                 calendarSources.map(
                   (
