@@ -1,7 +1,7 @@
 name: Usage validation
 on:
   push:
-    branches: [usage-quota-savings]
+    branches: [usage-quota-savings, fix-weather-freshness]
   pull_request:
     branches: [main]
 permissions:
@@ -39,6 +39,10 @@ jobs:
         env:
           PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
         run: node tests/tv-weather-layout.browser.mjs
+      - name: Weather refresh and recovery regression
+        env:
+          PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
+        run: node tests/weather-refresh.browser.mjs
       - name: Save TV layout screenshots
         if: always()
         uses: actions/upload-artifact@v4
