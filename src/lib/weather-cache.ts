@@ -1,5 +1,7 @@
-export const WEATHER_REFRESH_MS = 15 * 60 * 1000;
-export const WEATHER_MAX_AGE_MS = 30 * 60 * 1000;
+export const WEATHER_REFRESH_MS = 30 * 60 * 1000;
+// Incoming observations must be recent; displayed readings can age until the next poll.
+export const WEATHER_PROVIDER_MAX_AGE_MS = 30 * 60 * 1000;
+export const WEATHER_MAX_AGE_MS = WEATHER_PROVIDER_MAX_AGE_MS + WEATHER_REFRESH_MS;
 export const WEATHER_OUTAGE_MS = 2 * 60 * 60 * 1000;
 export const WEATHER_REQUEST_MS = 40 * 1000;
 const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
@@ -24,7 +26,7 @@ export function providerObservationTime(time: unknown, offsetSeconds: unknown, n
   }
   const timestamp = Date.parse(time + "Z") - offsetSeconds * 1000;
   if (!Number.isFinite(timestamp) || timestamp > now + FUTURE_TOLERANCE_MS ||
-      now - timestamp > WEATHER_MAX_AGE_MS) {
+      now - timestamp > WEATHER_PROVIDER_MAX_AGE_MS) {
     throw new Error("Weather provider observation is out of date.");
   }
   return new Date(timestamp).toISOString();
@@ -76,7 +78,7 @@ export async function fetchWeatherSnapshot(
         const response = await fetcher(url, { cache: "no-store", signal: controller.signal });
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error ?? "Weather refresh failed.");
-        if (!validWeatherSnapshot(data) || observationAge(data.observedAt) > WEATHER_MAX_AGE_MS ||
+        if (!validWeatherSnapshot(data) || observationAge(data.observedAt) > WEATHER_PROVIDER_MAX_AGE_MS ||
             observationAge(data.fetchedAt) > WEATHER_REFRESH_MS) {
           throw new Error("Weather response is out of date or invalid.");
         }

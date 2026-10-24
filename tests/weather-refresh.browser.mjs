@@ -21,7 +21,7 @@ try {
   // An old client cache without provenance must not prevent the first fetch.
   await page.addInitScript(() => localStorage.setItem("family-display:weather:lynden, washington",
     JSON.stringify({ savedAt: Date.now(), data: { current: { temperature: 99 }, daily: [] } })));
-  let simulated = initial, calls = 0, mode = "fresh", temperature = 40;
+  let simulated = initial, calls = 0, mode = "fresh", temperature = 40, observationOffset = 29 * 60000;
   const temperatures = [];
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
@@ -40,7 +40,7 @@ try {
       calls++;
       if (mode === "hang") return; // Deliberately leave the request unresolved.
       if (mode === "fail") return route.fulfill({ status: 503, json: { error: "Provider unavailable" } });
-      const stamp = new Date(simulated - (mode === "stale" ? 24 * 3600000 : 0)).toISOString();
+      const stamp = new Date(simulated - (mode === "stale" ? 24 * 3600000 : observationOffset)).toISOString();
       temperatures.push(temperature);
       return route.fulfill({ json: {
         observedAt: stamp, fetchedAt: new Date(simulated).toISOString(),
@@ -54,19 +54,24 @@ try {
   await page.goto(base);
   await page.waitForFunction(() => document.querySelector(".temperature")?.textContent.includes("40"));
   assert.ok(calls >= 1);
-  assert.match(await page.locator(".weatherFreshness").innerText(), /As of.*7:00/s);
+  assert.match(await page.locator(".weatherFreshness").innerText(), /As of.*6:31/s);
   console.log("PASS legacy data discarded; provider observation time displayed");
 
   const before = calls;
-  simulated += 15 * 60000; temperature = 45;
-  await page.clock.fastForward(15 * 60000);
+  simulated += 29 * 60000;
+  await page.clock.fastForward(29 * 60000);
+  await page.waitForTimeout(50);
+  assert.equal(calls, before);
+  assert.match(await page.locator(".weatherFreshness").innerText(), /As of/);
+  simulated += 60000; temperature = 45; observationOffset = 0;
+  await page.clock.fastForward(60000);
   await page.waitForFunction(() => document.querySelector(".temperature")?.textContent.includes("45"));
   assert.ok(calls > before);
-  console.log("PASS fifteen-minute polling updates current conditions");
+  console.log("PASS thirty-minute polling updates current conditions");
 
   mode = "hang"; const beforeHang = calls;
-  simulated += 15 * 60000;
-  await page.clock.fastForward(15 * 60000);
+  simulated += 30 * 60000;
+  await page.clock.fastForward(30 * 60000);
   await page.waitForFunction(() => document.querySelector(".temperature") !== null);
   // Ensure route interception has received the hanging request before ticking its deadline.
   await page.waitForTimeout(50);

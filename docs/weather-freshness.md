@@ -16,10 +16,10 @@ The provider observation time and its UTC offset are preserved as observedAt;
 fetchedAt is separate. Observations over thirty minutes old, missing provenance,
 invalid data, and unreasonable future timestamps are rejected. Client requests
 have a forty-second deadline covering headers and body, including transports
-that do not settle after abort. Requests retry with one-to-fifteen-minute backoff.
+that do not settle after abort. Requests retry with one-to-thirty-minute backoff.
 
-Awake displays refresh every fifteen minutes. Resume rechecks saved data age;
-online recovery retries immediately. A timestamp under the weather icon shows
+Awake displays refresh every thirty minutes. Resume rechecks saved data age;
+online recovery retries immediately. Displayed observations stay current for sixty minutes (the thirty-minute incoming\nobservation limit plus one thirty-minute polling interval). Older readings show\nLast known even if the last request succeeded. The two-hour outage limit is unchanged.\nA timestamp under the weather icon shows
 As of or Last known. Only readings at most two hours old remain as outage fallback.
 Legacy saved weather without timestamps is ignored. The calendar, photos, and
 Supabase access patterns are unchanged.
