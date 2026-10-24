@@ -1,6 +1,7 @@
 "use client";
 
-import { WEATHER_REFRESH_MS, WEATHER_OUTAGE_MS, weatherCacheAge, weatherRefreshDelay } from "@/lib/weather-cache";
+import { WEATHER_REFRESH_MS, WEATHER_MAX_AGE_MS, WEATHER_OUTAGE_MS,
+  observationAge, validWeatherSnapshot, weatherRefreshDelay, fetchWeatherSnapshot } from "@/lib/weather-cache";
 
 import {
   useEffect,
@@ -32,6 +33,8 @@ type DailyWeather = {
 };
 
 type WeatherResponse = {
+  observedAt: string;
+  fetchedAt: string;
   location: {
     name: string;
     admin1: string;
@@ -102,275 +105,118 @@ export default function WeatherPanels({
   ] =
     useState("");
 
+  const [now, setNow] = useState(Date.now);
+
   useEffect(() => {
-    if (paused) {
-      return;
-    }
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
-    let cancelled =
-      false;
-
-    let timer:
-      number | undefined;
-
-    const normalDelay = WEATHER_REFRESH_MS;
-    let restoredSavedAt = 0;
-
-    const maxFailureDelay =
-      120 *
-      60 *
-      1000;
-
-    let failureDelay =
-      5 *
-      60 *
-      1000;
-
-    const cleanedLocation =
-      location?.trim() ??
-      "";
-
+  useEffect(() => {
+    if (paused || (!showWeather && !showForecast)) return;
+    let cancelled = false;
+    let inFlight = false;
+    let timer: number | undefined;
+    let retryDelay = 60_000;
+    let lastSuccess = 0;
+    const controller = new AbortController();
+    setWeather(null);
+    setLoading(true);
+    setError("");
+    const cleanedLocation = location?.trim() ?? "";
+    const cacheKey = `family-display:weather:${cleanedLocation.toLowerCase()}`;
     if (!cleanedLocation) {
-      setError(
-        "Weather location is not configured."
-      );
-
-      setLoading(
-        false
-      );
-
+      setError("Weather location is not configured.");
+      setLoading(false);
       return;
     }
 
-    const cacheKey =
-      `family-display:weather:${cleanedLocation.toLowerCase()}`;
-
-    /*
-      Weather is public data, so it is
-      safe to keep the last successful
-      result in localStorage.
-
-      Cached weather may be used for up
-      to 12 hours during an outage.
-    */
-
-    function restoreCachedWeather() {
+    function restore() {
       try {
-        const raw =
-          localStorage.getItem(
-            cacheKey
-          );
-
-        if (!raw) {
-          return false;
-        }
-
-        const cached =
-          JSON.parse(raw);
-
-        const savedAt =
-          Number(
-            cached?.savedAt
-          );
-
-        if (
-          weatherCacheAge(savedAt) > WEATHER_OUTAGE_MS
-        ) {
-          return false;
-        }
-
-        if (
-          !cached?.data
-            ?.current ||
-          !Array.isArray(
-            cached?.data
-              ?.daily
-          )
-        ) {
-          return false;
-        }
-
-        restoredSavedAt = savedAt;
-        setError("");
-        setWeather(
-          cached.data as
-            WeatherResponse
-        );
-
-        setLoading(
-          false
-        );
-
+        const cached = JSON.parse(localStorage.getItem(cacheKey) ?? "null");
+        if (!validWeatherSnapshot(cached?.data) ||
+            observationAge(cached.data.observedAt) > WEATHER_OUTAGE_MS) return false;
+        lastSuccess = Number(cached.savedAt) || 0;
+        setWeather(cached.data as WeatherResponse);
+        setLoading(false);
         return true;
-      } catch {
-        return false;
-      }
+      } catch { return false; }
     }
 
-    function scheduleNext(
-      delay: number
-    ) {
-      if (cancelled) {
-        return;
-      }
-
-      timer =
-        window.setTimeout(
-          loadWeather,
-          delay
-        );
+    function schedule(delay: number) {
+      if (cancelled) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(loadWeather, delay);
     }
 
     async function loadWeather() {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      window.clearTimeout(timer);
+      let delay = retryDelay;
       try {
-        const response =
-          await fetch(
-            `/api/weather?location=${encodeURIComponent(
-              cleanedLocation
-            )}`,
-            {
-              cache:
-                "no-store",
-            }
-          );
-
-        const data =
-          await response
-            .json()
-            .catch(
-              () =>
-                null
-            );
-
-        if (
-          !response.ok
-        ) {
-          const message =
-            data?.error ??
-            `Weather request failed with HTTP ${response.status}.`;
-
-          throw new Error(
-            message
-          );
-        }
-
-        if (
-          !data?.current ||
-          !Array.isArray(
-            data?.daily
-          )
-        ) {
-          throw new Error(
-            "Weather API returned an unexpected response."
-          );
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        setWeather(
-          data as
-            WeatherResponse
+        const data = await fetchWeatherSnapshot(
+          `/api/weather?location=${encodeURIComponent(cleanedLocation)}`, controller.signal
         );
-
-        try {
-          localStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-              savedAt:
-                Date.now(),
-
-              data,
-            })
-          );
-        } catch {
-          // Cache failures are harmless.
-        }
-
+        if (cancelled) return;
+        lastSuccess = Date.now();
+        setNow(lastSuccess);
+        setWeather(data as WeatherResponse);
         setError("");
-
-        setLoading(
-          false
-        );
-
-        failureDelay =
-          5 *
-          60 *
-          1000;
-
-        scheduleNext(
-          normalDelay
-        );
-      } catch (
-        requestError
-      ) {
-        console.error(
-          "Weather request error:",
-          requestError
-        );
-
-        if (cancelled) {
-          return;
+        try { localStorage.setItem(cacheKey, JSON.stringify({ savedAt: lastSuccess, data })); } catch {}
+        retryDelay = 60_000;
+        delay = WEATHER_REFRESH_MS;
+      } catch (error) {
+        if (cancelled) return;
+        setError(error instanceof Error ? error.message : "Weather refresh failed.");
+        setNow(Date.now());
+        // Retain a bounded, visibly labelled last-known reading; never make it fresh.
+        restore();
+        delay = retryDelay;
+        retryDelay = Math.min(retryDelay * 2, WEATHER_REFRESH_MS);
+      } finally {
+        inFlight = false;
+        if (!cancelled) {
+          setLoading(false);
+          schedule(delay);
         }
-
-        const restored =
-          restoreCachedWeather();
-
-        if (!restored) {
-          setError(
-            requestError instanceof
-              Error
-              ? requestError.message
-              : "Weather unavailable."
-          );
-        }
-
-        setLoading(
-          false
-        );
-
-        scheduleNext(
-          failureDelay
-        );
-
-        failureDelay =
-          Math.min(
-            failureDelay *
-              2,
-            maxFailureDelay
-          );
       }
     }
 
-    /*
-      Show cached weather immediately
-      if available while current weather
-      is being retrieved.
-    */
-
-    const restored = restoreCachedWeather();
-    const remaining = restored ? weatherRefreshDelay(restoredSavedAt) : 0;
-    if (remaining > 0) scheduleNext(remaining);
+    const restored = restore();
+    const remaining = restored ? weatherRefreshDelay(lastSuccess) : 0;
+    // A restored observation older than the current-data bound is retried immediately.
+    let cachedCurrent = false;
+    try {
+      const raw = JSON.parse(localStorage.getItem(cacheKey) ?? "null");
+      cachedCurrent = observationAge(raw?.data?.observedAt) <= WEATHER_MAX_AGE_MS;
+    } catch {}
+    if (remaining > 0 && cachedCurrent) schedule(remaining);
     else void loadWeather();
 
+    function refreshAfterRecovery() {
+      if (!cancelled) void loadWeather();
+    }
+    function refreshAfterFocus() {
+      if (weatherRefreshDelay(lastSuccess) === 0) refreshAfterRecovery();
+    }
+    window.addEventListener("online", refreshAfterRecovery);
+    window.addEventListener("focus", refreshAfterFocus);
     return () => {
-      cancelled =
-        true;
-
-      if (
-        timer !==
-        undefined
-      ) {
-        window.clearTimeout(
-          timer
-        );
-      }
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+      window.removeEventListener("online", refreshAfterRecovery);
+      window.removeEventListener("focus", refreshAfterFocus);
     };
-  }, [
-    location,
-    paused,
-  ]);
+  }, [location, paused, showWeather, showForecast]);
+
+  const expired = !weather || observationAge(weather.observedAt, now) > WEATHER_OUTAGE_MS;
+  const delayed = !!error || (!!weather && observationAge(weather.observedAt, now) > WEATHER_MAX_AGE_MS);
+  const observedTime = weather && !expired
+    ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit",
+        timeZone: weather.location.timezone || "America/Los_Angeles" }).format(new Date(weather.observedAt))
+    : "";
 
   if (
     !showWeather &&
@@ -381,7 +227,7 @@ export default function WeatherPanels({
 
   if (
     loading &&
-    !weather
+    expired
   ) {
     return (
       <>
@@ -404,10 +250,7 @@ export default function WeatherPanels({
     );
   }
 
-  if (
-    error &&
-    !weather
-  ) {
+  if (expired) {
     return (
       <>
         {showWeather && (
@@ -418,7 +261,7 @@ export default function WeatherPanels({
               </strong>
 
               <span>
-                {error}
+                {error || "Weather reading expired. Retrying…"}
               </span>
             </div>
           </section>
@@ -435,7 +278,7 @@ export default function WeatherPanels({
     );
   }
 
-  if (!weather) {
+  if (!weather || expired) {
     return null;
   }
 
@@ -444,12 +287,18 @@ export default function WeatherPanels({
       {showWeather && (
         <section className="card weatherCard">
           <div className="currentWeather">
-            <div className="weatherIcon">
+            <div className="weatherIcon" aria-label={delayed ? "Last known weather" : "Current weather"}>
+              <span className="weatherSymbol">
               {
                 weather
                   .current
                   .icon
               }
+              </span>
+              <small className={`weatherFreshness ${delayed ? "weatherFreshnessDelayed" : ""}`} role="status">
+                <span>{delayed ? "Last known" : "As of"}</span>
+                <span>{observedTime}</span>
+              </small>
             </div>
 
             <div className="weatherDetails">

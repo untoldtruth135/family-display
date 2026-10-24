@@ -48,7 +48,8 @@ try {
           }
         }});
         if (url.pathname === "/api/weather") return route.fulfill({ json: {
-          location: { name: "Lynden", admin1: "Washington" },
+          observedAt: "2026-10-15T19:00:00Z", fetchedAt: "2026-10-15T19:00:00Z",
+          location: { name: "Lynden", admin1: "Washington", timezone: "America/Los_Angeles" },
           current: { temperature: 57, feelsLike: 53, precipitationProbability: 0,
             condition: "Mainly clear", icon: "🌤️", weatherCode: 1 },
           daily: Array.from({ length: 5 }, (_, i) => ({

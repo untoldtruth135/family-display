@@ -3,127 +3,49 @@ import {
   NextResponse,
 } from "next/server";
 
-export const dynamic =
-  "auto";
+import { providerObservationTime } from "@/lib/weather-cache";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+const noCacheHeaders = {
+  "Cache-Control": "no-store",
+  "CDN-Cache-Control": "no-store",
+  "Netlify-CDN-Cache-Control": "no-store",
+  "Netlify-Vary": "query=location",
+};
 
 type WeatherDescription = {
   condition: string;
   icon: string;
 };
 
-async function fetchWithRetry(
-  url: string,
-  revalidateSeconds: number,
-  attempts = 3
-) {
-  let lastError:
-    unknown = null;
-
-  for (
-    let attempt = 1;
-    attempt <= attempts;
-    attempt++
-  ) {
-    const controller =
-      new AbortController();
-
-    const timeout =
-      setTimeout(
-        () => {
-          controller.abort();
-        },
-        10_000
-      );
-
+async function fetchWithRetry(url: string, attempts = 2) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout>;
     try {
-      const response =
-        await fetch(
-          url,
-          {
-            next: { revalidate: revalidateSeconds },
-
-            signal:
-              controller.signal,
-
-            headers: {
-              Accept:
-                "application/json",
-            },
-          }
-        );
-
-      clearTimeout(
-        timeout
-      );
-
-      /*
-        Retry temporary
-        upstream failures.
-      */
-
-      if (
-        response.status >=
-          500 &&
-        attempt <
-          attempts
-      ) {
-        await new Promise(
-          (
-            resolve
-          ) =>
-            setTimeout(
-              resolve,
-              500 *
-                attempt
-            )
-        );
-
-        continue;
-      }
-
-      return response;
-    } catch (
-      error
-    ) {
-      clearTimeout(
-        timeout
-      );
-
-      lastError =
-        error;
-
-      if (
-        attempt <
-        attempts
-      ) {
-        await new Promise(
-          (
-            resolve
-          ) =>
-            setTimeout(
-              resolve,
-              500 *
-                attempt
-            )
-        );
-
-        continue;
-      }
-    }
+      return await Promise.race([
+        (async () => {
+          const response = await fetch(url, {
+            cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" },
+          });
+          // Consume the body before clearing the deadline.
+          const data = await response.json();
+          if (!response.ok) throw new Error(`Weather provider HTTP ${response.status}.`);
+          return data;
+        })(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            controller.abort();
+            reject(new Error("Weather provider timed out."));
+          }, 8000);
+        }),
+      ]);
+    } catch (error) { lastError = error; }
+    finally { clearTimeout(timeout!); controller.abort(); }
   }
-
-  if (
-    lastError instanceof
-    Error
-  ) {
-    throw new Error(
-      `Weather provider connection failed after ${attempts} attempts: ${lastError.message}`
-    );
-  }
-
-  throw new Error(
-    `Weather provider connection failed after ${attempts} attempts.`
-  );
+  throw lastError instanceof Error ? lastError : new Error("Weather provider unavailable.");
 }
 
 function getWeatherDescription(
@@ -297,7 +219,7 @@ export async function GET(
         .get(
           "location"
         )
-        ?.trim();
+        ?.trim().replace(/\s+/g, " ").slice(0, 120);
 
     if (!location) {
       return NextResponse.json(
@@ -307,6 +229,7 @@ export async function GET(
         },
         {
           status: 400,
+          headers: noCacheHeaders,
         }
       );
     }
@@ -342,22 +265,7 @@ export async function GET(
       "json"
     );
 
-    const geocodeResponse =
-      await fetchWithRetry(
-        geocodeUrl.toString(),
-        24 * 60 * 60
-      );
-
-    if (
-      !geocodeResponse.ok
-    ) {
-      throw new Error(
-        `Geocoding request failed with HTTP ${geocodeResponse.status}.`
-      );
-    }
-
-    const geocodeData =
-      await geocodeResponse.json();
+    const geocodeData = await fetchWithRetry(geocodeUrl.toString());
 
     const place =
       geocodeData
@@ -371,6 +279,7 @@ export async function GET(
         },
         {
           status: 404,
+          headers: noCacheHeaders,
         }
       );
     }
@@ -440,22 +349,14 @@ export async function GET(
       "5"
     );
 
-    const forecastResponse =
-      await fetchWithRetry(
-        forecastUrl.toString(),
-        15 * 60
-      );
-
-    if (
-      !forecastResponse.ok
-    ) {
-      throw new Error(
-        `Forecast request failed with HTTP ${forecastResponse.status}.`
-      );
+    const forecastData = await fetchWithRetry(forecastUrl.toString());
+    const observedAt = providerObservationTime(forecastData?.current?.time, forecastData?.utc_offset_seconds);
+    if (!Number.isFinite(forecastData?.current?.temperature_2m) ||
+        !Number.isFinite(forecastData?.current?.apparent_temperature) ||
+        !Number.isFinite(forecastData?.current?.weather_code) ||
+        !Array.isArray(forecastData?.daily?.time) || !forecastData.daily.time.length) {
+      throw new Error("Weather provider returned incomplete conditions.");
     }
-
-    const forecastData =
-      await forecastResponse.json();
 
     /*
       =======================================================
@@ -673,6 +574,8 @@ export async function GET(
 
     return NextResponse.json(
       {
+        observedAt,
+        fetchedAt: new Date().toISOString(),
         location: {
           name:
             place.name,
@@ -703,8 +606,10 @@ export async function GET(
       },
       {
         headers: {
-          "Cache-Control":
-            "public, max-age=0, s-maxage=900, stale-while-revalidate=60",
+          ...noCacheHeaders,
+          // Only this public response cache is shared; no stale serving or nested data cache.
+          "CDN-Cache-Control": "public, s-maxage=300, must-revalidate",
+          "Netlify-CDN-Cache-Control": "public, s-maxage=300, must-revalidate",
         },
       }
     );
@@ -723,7 +628,8 @@ export async function GET(
             : "Unable to load weather.",
       },
       {
-        status: 500,
+        status: 503,
+        headers: { ...noCacheHeaders, "Retry-After": "60" },
       }
     );
   }
