@@ -28,6 +28,9 @@ try {
   for (const [width, height] of [[854, 480], [960, 540], [1280, 720], [1920, 1080]]) {
     for (const fontFamily of ["Arial", "Georgia", "Times New Roman"]) {
     for (const scenario of ["busy", "empty"]) {
+    for (const quoteKind of ["short", "long", "multiline"]) {
+      const quote = "Strength isn’t proving you can handle everything alone; it’s knowing when to trust God, ask for help, and keep moving forward with courage. (Proverbs 3:5–6)";
+      const message = quoteKind === "short" ? "Keep moving forward." : quoteKind === "long" ? Array(5).fill(quote).join(" ") : Array(6).fill(quote).join("\n");
       const page = await browser.newPage({ viewport: { width, height } });
       await page.clock.install({ time: new Date("2026-10-15T19:00:00Z") });
       // This test never contacts Supabase, Google, or any production host.
@@ -38,7 +41,7 @@ try {
           household: { id: "test-household", name: "Test Family" },
           display: {
             id: "test-display", name: "TV", weatherLocation: "Lynden, Washington",
-            message: "Strength isn’t proving you can handle everything alone; it’s knowing when to trust God, ask for help, and keep moving forward with courage. (Proverbs 3:5–6)", messageExpiresAt: null, scheduledMessages: [],
+            message, messageExpiresAt: null, scheduledMessages: [],
             orientation: "landscape", timezone: "America/Los_Angeles",
             use24HourClock: false, theme: "light", fontFamily,
             accentColor: "#169fe8", cardOpacity: 0.95,
@@ -108,6 +111,15 @@ try {
         assert.deepEqual(await page.locator(".agendaDays .todayAgendaMore").allTextContents(),
           ["+2 more on calendar", "+1 more on calendar"]);
       }
+      // Agenda and font loading can resize the card after the initial render.
+      // Wait for the observer's animation-frame fit before measuring.
+      await page.waitForFunction(() => {
+        const box = document.querySelector(".autoFitMessage");
+        const content = box?.querySelector(".autoFitMessageContent");
+        return box?.dataset.quoteFit === "fitted" && content &&
+          box.scrollHeight <= box.clientHeight + 1 &&
+          content.getBoundingClientRect().height <= box.clientHeight;
+      });
       const cardGeometry = await page.evaluate(() => {
         const card = document.querySelector(".messageCard").getBoundingClientRect();
         const today = document.querySelector('[aria-label="TODAY"]').getBoundingClientRect();
@@ -123,11 +135,36 @@ try {
       assert.ok(cardGeometry.quoteBottom <= cardGeometry.cardBottom, JSON.stringify(cardGeometry));
       assert.ok(cardGeometry.quoteScroll <= cardGeometry.quoteHeight + 1,
         "Quote clipped: " + JSON.stringify({ width, height, fontFamily, scenario, cardGeometry }));
+      await page.waitForFunction(() => document.querySelector(".autoFitMessage")?.dataset.quoteFit === "fitted");
+      const verifyQuote = async () => {
+        const result = await page.evaluate(() => {
+          const box = document.querySelector(".autoFitMessage");
+          const content = box.querySelector(".autoFitMessageContent");
+          const b = box.getBoundingClientRect();
+          const c = content.getBoundingClientRect();
+          const style = getComputedStyle(box);
+          return { box: b.toJSON(), content: c.toJSON(), paddingBottom: style.paddingBottom, text: content.textContent, font: parseFloat(getComputedStyle(content).fontSize),
+            maximum: parseFloat(style.fontSize), fits: c.top >= b.top - 0.5 &&
+              c.bottom <= b.bottom - parseFloat(style.paddingBottom) + 0.5 &&
+              c.left >= b.left - 0.5 && c.right <= b.right + 0.5,
+            scrollFits: box.scrollHeight <= box.clientHeight + 1 };
+        });
+        assert.equal(result.text, message);
+        assert.ok(result.fits && result.scrollFits, "Quote text clipped: " + JSON.stringify({ width, height, fontFamily, scenario, quoteKind, result }));
+        if (quoteKind === "short") assert.equal(result.font, result.maximum);
+      };
+      await verifyQuote();
+      await page.setViewportSize({ width: width + 64, height: height + 36 });
+      await page.waitForTimeout(100);
+      await verifyQuote();
+      await page.setViewportSize({ width, height });
+      await page.waitForTimeout(100);
       if (fontFamily === "Georgia") await page.screenshot({
-        path: "artifacts/weather-layout/" + width + "x" + height + "-" + scenario + ".png"
+        path: "artifacts/weather-layout/" + width + "x" + height + "-" + scenario + "-" + quoteKind + ".png"
       });
-      console.log("PASS weather and Today/Tomorrow/quote: " + width + "x" + height + " " + fontFamily + " " + scenario);
+      console.log("PASS weather and Today/Tomorrow/quote: " + width + "x" + height + " " + fontFamily + " " + scenario + " " + quoteKind);
       await page.close();
+    }
     }
     }
   }
