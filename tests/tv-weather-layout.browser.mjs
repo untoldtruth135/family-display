@@ -111,6 +111,15 @@ try {
         assert.deepEqual(await page.locator(".agendaDays .todayAgendaMore").allTextContents(),
           ["+2 more on calendar", "+1 more on calendar"]);
       }
+      // Agenda and font loading can resize the card after the initial render.
+      // Wait for the observer's animation-frame fit before measuring.
+      await page.waitForFunction(() => {
+        const box = document.querySelector(".autoFitMessage");
+        const content = box?.querySelector(".autoFitMessageContent");
+        return box?.dataset.quoteFit === "fitted" && content &&
+          box.scrollHeight <= box.clientHeight + 1 &&
+          content.getBoundingClientRect().height <= box.clientHeight;
+      });
       const cardGeometry = await page.evaluate(() => {
         const card = document.querySelector(".messageCard").getBoundingClientRect();
         const today = document.querySelector('[aria-label="TODAY"]').getBoundingClientRect();
