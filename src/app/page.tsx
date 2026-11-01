@@ -16,6 +16,7 @@ import WeatherPanels from "@/components/WeatherPanels";
 import RotatingBackground from "@/components/RotatingBackground";
 import AutoScrollEvents from "@/components/AutoScrollEvents";
 import AutoScrollText from "@/components/AutoScrollText";
+import AutoFitMessage from "@/components/AutoFitMessage";
 
 /* =========================================================
    TYPES
@@ -2216,7 +2217,7 @@ export default function Home() {
               {showMessage && (
                 <>
                   {showAgenda && <div className="todayAgendaDivider" />}
-                  <div className="messageText">{message || " "}</div>
+                  <AutoFitMessage text={message || " "} fontFamily={fontFamily} />
                 </>
               )}
 
