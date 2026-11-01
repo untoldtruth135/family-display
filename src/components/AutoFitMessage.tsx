@@ -25,7 +25,7 @@ export default function AutoFitMessage({ text, fontFamily }: Props) {
       // A sleeping/hidden display is measured again when it becomes visible.
       if (width <= 0 || height <= 0) return;
       const maximum = Math.max(1, pixels(style.fontSize));
-      const minimum = Math.min(6, maximum);
+      const minimum = 1;
       const fits = (size: number) => {
         content.style.fontSize = size + "px";
         return content.scrollHeight <= Math.ceil(height) && content.scrollWidth <= Math.ceil(width) &&
