@@ -3676,3 +3676,9 @@ cat >> src/app/globals.css <<'EOF'
   justify-content: flex-start;
   overflow: auto;
 }
+
+/* Tablet/portrait rows use intrinsic sizing instead of the TV's fixed grid. */
+@media (max-width: 900px) {
+  .messageText.autoFitMessage { min-height: 120px; }
+}
+.orientation-portrait .messageText.autoFitMessage { min-height: 120px; }
