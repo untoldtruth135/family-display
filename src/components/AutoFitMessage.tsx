@@ -28,7 +28,7 @@ export default function AutoFitMessage({ text, fontFamily }: Props) {
       const minimum = Math.min(6, maximum);
       const fits = (size: number) => {
         content.style.fontSize = size + "px";
-        return content.scrollHeight <= height && content.scrollWidth <= width &&
+        return content.scrollHeight <= Math.ceil(height) && content.scrollWidth <= Math.ceil(width) &&
           content.getBoundingClientRect().height <= height;
       };
       let size = maximum;
