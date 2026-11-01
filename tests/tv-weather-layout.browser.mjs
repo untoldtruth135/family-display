@@ -143,7 +143,7 @@ try {
           const b = box.getBoundingClientRect();
           const c = content.getBoundingClientRect();
           const style = getComputedStyle(box);
-          return { text: content.textContent, font: parseFloat(getComputedStyle(content).fontSize),
+          return { box: b.toJSON(), content: c.toJSON(), paddingBottom: style.paddingBottom, text: content.textContent, font: parseFloat(getComputedStyle(content).fontSize),
             maximum: parseFloat(style.fontSize), fits: c.top >= b.top - 0.5 &&
               c.bottom <= b.bottom - parseFloat(style.paddingBottom) + 0.5 &&
               c.left >= b.left - 0.5 && c.right <= b.right + 0.5,

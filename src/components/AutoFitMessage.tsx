@@ -21,7 +21,8 @@ export default function AutoFitMessage({ text, fontFamily }: Props) {
       const style = window.getComputedStyle(box);
       const pixels = (value: string) => Number.parseFloat(value) || 0;
       const width = box.clientWidth - pixels(style.paddingLeft) - pixels(style.paddingRight);
-      const height = box.clientHeight - pixels(style.paddingTop) - pixels(style.paddingBottom);
+      const height = Math.min(box.clientHeight, box.getBoundingClientRect().height) -
+        pixels(style.paddingTop) - pixels(style.paddingBottom) - 2;
       // A sleeping/hidden display is measured again when it becomes visible.
       if (width <= 0 || height <= 0) return;
       const maximum = Math.max(1, pixels(style.fontSize));
