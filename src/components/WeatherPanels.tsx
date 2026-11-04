@@ -119,6 +119,9 @@ export default function WeatherPanels({
     let timer: number | undefined;
     let retryDelay = 60_000;
     let lastSuccess = 0;
+    let lastObservation = 0;
+    let lastAttempt = 0;
+    let nextAttemptAt = Infinity;
     const controller = new AbortController();
     setWeather(null);
     setLoading(true);
@@ -137,6 +140,7 @@ export default function WeatherPanels({
         if (!validWeatherSnapshot(cached?.data) ||
             observationAge(cached.data.observedAt) > WEATHER_OUTAGE_MS) return false;
         lastSuccess = Number(cached.savedAt) || 0;
+        lastObservation = Date.parse(cached.data.observedAt);
         setWeather(cached.data as WeatherResponse);
         setLoading(false);
         return true;
@@ -146,12 +150,15 @@ export default function WeatherPanels({
     function schedule(delay: number) {
       if (cancelled) return;
       window.clearTimeout(timer);
+      nextAttemptAt = Date.now() + delay;
       timer = window.setTimeout(loadWeather, delay);
     }
 
     async function loadWeather() {
       if (cancelled || inFlight) return;
       inFlight = true;
+      lastAttempt = Date.now();
+      nextAttemptAt = Infinity;
       window.clearTimeout(timer);
       let delay = retryDelay;
       try {
@@ -160,6 +167,7 @@ export default function WeatherPanels({
         );
         if (cancelled) return;
         lastSuccess = Date.now();
+        lastObservation = Date.parse(data.observedAt);
         setNow(lastSuccess);
         setWeather(data as WeatherResponse);
         setError("");
@@ -197,17 +205,33 @@ export default function WeatherPanels({
     function refreshAfterRecovery() {
       if (!cancelled) void loadWeather();
     }
-    function refreshAfterFocus() {
-      if (weatherRefreshDelay(lastSuccess) === 0) refreshAfterRecovery();
+    function refreshIfDue() {
+      if (cancelled || inFlight) return;
+      const time = Date.now();
+      // Recover a lost/suspended poll without resetting outage retry backoff.
+      const newlyExpired = lastObservation > 0 &&
+        time - lastObservation > WEATHER_OUTAGE_MS &&
+        lastAttempt <= lastObservation + WEATHER_OUTAGE_MS;
+      if (time >= nextAttemptAt || newlyExpired) void loadWeather();
     }
+    function refreshAfterVisibility() {
+      if (document.visibilityState === "visible") refreshIfDue();
+    }
+    // Independent of the one-shot poll: WebViews can lose that timer on resume.
+    const watchdog = window.setInterval(refreshIfDue, 30_000);
     window.addEventListener("online", refreshAfterRecovery);
-    window.addEventListener("focus", refreshAfterFocus);
+    window.addEventListener("focus", refreshIfDue);
+    window.addEventListener("pageshow", refreshIfDue);
+    document.addEventListener("visibilitychange", refreshAfterVisibility);
     return () => {
       cancelled = true;
       controller.abort();
       window.clearTimeout(timer);
+      window.clearInterval(watchdog);
       window.removeEventListener("online", refreshAfterRecovery);
-      window.removeEventListener("focus", refreshAfterFocus);
+      window.removeEventListener("focus", refreshIfDue);
+      window.removeEventListener("pageshow", refreshIfDue);
+      document.removeEventListener("visibilitychange", refreshAfterVisibility);
     };
   }, [location, paused, showWeather, showForecast]);
 
