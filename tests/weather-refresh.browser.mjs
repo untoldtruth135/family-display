@@ -21,6 +21,13 @@ try {
   // An old client cache without provenance must not prevent the first fetch.
   await page.addInitScript(() => localStorage.setItem("family-display:weather:lynden, washington",
     JSON.stringify({ savedAt: Date.now(), data: { current: { temperature: 99 }, daily: [] } })));
+  // Simulate a TV losing its one-shot weather polling timer. The independent
+  // recovery check must still refresh; the unmodified app stays expired.
+  await page.addInitScript(() => {
+    const timeout = window.setTimeout.bind(window);
+    window.setTimeout = (callback, delay, ...args) =>
+      delay === 30 * 60000 ? 0 : timeout(callback, delay, ...args);
+  });
   let simulated = initial, calls = 0, mode = "fresh", temperature = 40, observationOffset = 29 * 60000;
   const temperatures = [];
   await page.route("**/*", async route => {
@@ -67,7 +74,8 @@ try {
   await page.clock.fastForward(60000);
   await page.waitForFunction(() => document.querySelector(".temperature")?.textContent.includes("45"));
   assert.ok(calls > before);
-  console.log("PASS thirty-minute polling updates current conditions");
+  assert.equal(calls, before + 1);
+  console.log("PASS lost polling timer recovers at thirty minutes without duplicate requests");
 
   mode = "hang"; const beforeHang = calls;
   simulated += 30 * 60000;
@@ -99,6 +107,35 @@ try {
   await page.waitForFunction(() => document.querySelector(".weatherUnavailable")?.textContent.includes("Weather unavailable"));
   assert.equal(await page.locator(".temperature").count(), 0);
   console.log("PASS expired fallback is removed instead of displayed indefinitely");
+
+  mode = "fresh"; temperature = 49; simulated += 3 * 3600000;
+  await page.clock.setSystemTime(new Date(simulated));
+  const beforeWatchdog = calls;
+  simulated += 30000;
+  await page.clock.fastForward(30000);
+  await page.waitForFunction(() => document.querySelector(".temperature")?.textContent.includes("49"));
+  assert.equal(calls, beforeWatchdog + 1);
+  console.log("PASS expired weather recovers independently without reload or connectivity events");
+
+  // Jump the wall clock without running pending poll timers, as after TV sleep.
+  mode = "fresh"; temperature = 50; simulated += 3 * 3600000;
+  await page.clock.setSystemTime(new Date(simulated));
+  const beforeResume = calls;
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pageshow"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.waitForFunction(() => document.querySelector(".temperature")?.textContent.includes("50"));
+  assert.equal(calls, beforeResume + 1);
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pageshow"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.waitForTimeout(50);
+  assert.equal(calls, beforeResume + 1);
+  console.log("PASS expiry after TV sleep recovers on visibility/pageshow without repeated requests");
 
   mode = "fresh"; temperature = 51;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
