@@ -28,6 +28,7 @@ jobs:
       - name: Offline regression tests
         run: node --experimental-strip-types --test tests/*.test.mjs
       - name: Next.js build and type checks
+        id: build
         run: npm run build
       - name: Install isolated browser test tools
         env:
@@ -40,10 +41,12 @@ jobs:
           PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
         run: node tests/tv-weather-layout.browser.mjs
       - name: Weather refresh and recovery regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
           PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
         run: node tests/weather-refresh.browser.mjs
       - name: Calendar connection and recovery regression
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
           PLAYWRIGHT_PACKAGE_ROOT: ${{ runner.temp }}/fd-browser
         run: node tests/calendar-connection.browser.mjs
